@@ -3,6 +3,7 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const getPort = require('get-port');
 require('dotenv').config();
 
 const { processAudioWithOpenAI } = require('./services/openaiService');
@@ -10,7 +11,7 @@ const { downloadPodcastAudio } = require('./services/podcastService');
 const { smartCompress } = require('./services/audioCompressionService');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const DEFAULT_PORT = Number(process.env.PORT) || 3000;
 
 // 中间件配置
 app.use(cors());
@@ -140,7 +141,16 @@ app.use((req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`🎙️ Podcast提取器服务器运行在 http://localhost:${PORT}`);
-    console.log(`🎙️ Podcast Extractor server running on http://localhost:${PORT}`);
-});
+// 启动服务器（自动寻找可用端口）
+(async () => {
+    try {
+        const port = await getPort({ port: DEFAULT_PORT });
+        app.listen(port, () => {
+            console.log(`🎙️ Podcast提取器服务器运行在 http://localhost:${port}`);
+            console.log(`🎙️ Podcast Extractor server running on http://localhost:${port}`);
+        });
+    } catch (err) {
+        console.error('启动服务器失败:', err);
+        process.exit(1);
+    }
+})();
