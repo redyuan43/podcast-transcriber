@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎙️ Podcast提取器 / Podcast Extractor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'blue-gradient-start': '#4f46e5',
+                        'blue-gradient-end': '#06b6d4',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
+        }
+        .glass {
+            backdrop-filter: blur(16px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+        .loading {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+    <!-- Language Toggle -->
+    <div class="absolute top-6 right-6 z-10">
+        <button 
+            id="languageToggle" 
+            class="glass rounded-full px-4 py-2 text-sm font-medium transition-all hover:shadow-lg border border-white/20"
+            onclick="toggleLanguage()"
+        >
+            <span id="langFlag">🇨🇳</span> 
+            <span id="langText">中文</span>
+        </button>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="mb-4">
+                <span class="text-6xl">🎙️</span>
+            </div>
+            <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent mb-4">
+                <span id="title">Podcast提取器</span>
+            </h1>
+            <p class="text-lg text-slate-600" id="subtitle">
+                只需提供Podcast音频链接，即可获得高质量的文字转录和AI智能总结
+            </p>
+        </div>
+
+        <!-- Main Form Card -->
+        <div class="glass rounded-2xl shadow-xl border border-white/20 p-8 mb-8">
+            <form id="podcastForm" onsubmit="processPodcast(event)">
+                <!-- URL Input -->
+                <div class="mb-6">
+                    <label class="flex items-center text-sm font-medium text-slate-700 mb-3">
+                        <span class="text-lg mr-2">🔗</span>
+                        <span id="urlLabel">Podcast音频链接</span>
+                    </label>
+                    <input 
+                        type="url" 
+                        id="podcastUrl" 
+                        placeholder="https://example.com/podcast/episode"
+                        class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-slate-700"
+                        required
+                    >
+                    <p class="text-xs text-slate-500 mt-2" id="urlHelper">
+                        支持 Apple Podcasts 和小宇宙播客链接
+                    </p>
+                </div>
+
+                <!-- Operation Type -->
+                <div class="mb-6">
+                    <label class="text-sm font-medium text-slate-700 mb-3 block" id="operationLabel">
+                        操作类型
+                    </label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <label class="flex items-center p-4 border border-slate-200 rounded-xl cursor-pointer hover:bg-blue-50 transition-all">
+                            <input type="radio" name="operation" value="transcribe_summarize" checked class="mr-3 text-blue-600">
+                            <div>
+                                <div class="font-medium text-slate-800" id="option1Title">转录并总结</div>
+                                <div class="text-sm text-slate-600" id="option1Desc">获得转录文本和AI总结</div>
+                            </div>
+                        </label>
+                        <label class="flex items-center p-4 border border-slate-200 rounded-xl cursor-pointer hover:bg-blue-50 transition-all">
+                            <input type="radio" name="operation" value="transcribe_only" class="mr-3 text-blue-600">
+                            <div>
+                                <div class="font-medium text-slate-800" id="option2Title">仅转录</div>
+                                <div class="text-sm text-slate-600" id="option2Desc">只获得转录文本</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Language Settings -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <!-- Audio Language Detection -->
+                    <div>
+                        <label class="text-sm font-medium text-slate-700 mb-3 block" id="audioLangLabel">
+                            音频语言
+                        </label>
+                        <select id="audioLanguage" class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-slate-700">
+                            <option value="auto" id="autoDetect">自动检测</option>
+                            <option value="zh">中文</option>
+                            <option value="en">English</option>
+                            <option value="ja">日本語</option>
+                            <option value="ko">한국어</option>
+                        </select>
+                    </div>
+
+                    <!-- Output Language -->
+                    <div>
+                        <label class="text-sm font-medium text-slate-700 mb-3 block" id="outputLangLabel">
+                            总结语言
+                        </label>
+                        <select id="outputLanguage" class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-slate-700">
+                            <option value="zh" id="chineseOption">中文</option>
+                            <option value="en" id="englishOption">English</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <button 
+                    type="submit" 
+                    id="submitBtn"
+                    class="w-full gradient-bg text-white font-medium py-4 rounded-xl hover:shadow-lg transition-all duration-300 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <span id="submitText">🚀 开始处理</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="hidden">
+            <div class="glass rounded-2xl shadow-xl border border-white/20 p-8">
+                <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center">
+                    <span class="text-2xl mr-3">📄</span>
+                    <span id="resultsTitle">处理结果</span>
+                </h2>
+                
+                <!-- Loading State -->
+                <div id="loadingState" class="text-center py-12">
+                    <div class="loading text-6xl mb-4">🎧</div>
+                    <p class="text-lg text-slate-600" id="loadingText">正在处理您的播客...</p>
+                    <div class="mt-4 bg-slate-200 rounded-full h-2">
+                        <div class="bg-gradient-to-r from-blue-500 to-cyan-500 h-2 rounded-full loading" style="width: 60%"></div>
+                    </div>
+                </div>
+
+                <!-- Results Content -->
+                <div id="resultsContent" class="hidden">
+                    <!-- Transcript Section -->
+                    <div class="mb-8">
+                        <h3 class="text-xl font-semibold text-slate-800 mb-4 flex items-center">
+                            <span class="text-xl mr-2">📝</span>
+                            <span id="transcriptTitle">转录文本</span>
+                        </h3>
+                        <div class="bg-slate-50 rounded-xl p-6 border border-slate-200">
+                            <pre id="transcriptText" class="whitespace-pre-wrap text-sm text-slate-700 leading-relaxed font-mono"></pre>
+                        </div>
+                    </div>
+
+                    <!-- Summary Section -->
+                    <div id="summarySection" class="hidden">
+                        <h3 class="text-xl font-semibold text-slate-800 mb-4 flex items-center">
+                            <span class="text-xl mr-2">🤖</span>
+                            <span id="summaryTitle">AI总结</span>
+                        </h3>
+                        <div class="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-6 border border-blue-200">
+                            <div id="summaryText" class="text-slate-700 leading-relaxed"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error State -->
+                <div id="errorState" class="hidden text-center py-12">
+                    <div class="text-6xl mb-4">❌</div>
+                    <p class="text-lg text-red-600" id="errorText">处理过程中出现错误</p>
+                    <p class="text-sm text-slate-600 mt-2" id="errorDetails"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
