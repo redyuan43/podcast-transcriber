@@ -51,7 +51,7 @@ async function extractAudioUrl(url) {
         }
 
         // 小宇宙链接处理
-        if (url.includes('xiaoyuzhou.fm') || url.includes('小宇宙')) {
+        if (url.includes('xiaoyuzhoufm.com') || url.includes('小宇宙')) {
             return await extractXiaoyuzhouAudio(url);
         }
 
@@ -73,102 +73,78 @@ function isDirectAudioUrl(url) {
 }
 
 /**
- * 处理Apple Podcasts链接 - 使用RSS解析
+ * 处理Apple Podcasts链接 - 标准iTunes API → RSS → enclosure流程
  */
 async function extractApplePodcastAudio(url) {
     try {
-        console.log('处理Apple Podcasts链接（RSS解析）...');
+        console.log('处理Apple Podcasts链接（iTunes API → RSS解析）...');
         
-        // 方法1: 尝试从页面发现RSS feed
-        try {
-            console.log('尝试从Apple Podcasts页面发现RSS...');
-            const response = await axios.get(url, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-                },
-                timeout: 15000
-            });
-
-            const html = response.data;
+        // 提取节目ID
+        const podcastIdMatch = url.match(/id(\d+)/);
+        if (!podcastIdMatch) {
+            throw new Error('无法从URL中提取节目ID');
+        }
+        
+        const podcastId = podcastIdMatch[1];
+        const episodeIdMatch = url.match(/i=(\d+)/);
+        const episodeId = episodeIdMatch ? episodeIdMatch[1] : null;
+        
+        console.log(`节目ID: ${podcastId}${episodeId ? `, Episode ID: ${episodeId}` : ''}`);
+        
+        // 使用iTunes API查询RSS feed
+        const itunesApiUrl = `https://itunes.apple.com/lookup?id=${podcastId}&entity=podcast`;
+        console.log(`查询iTunes API: ${itunesApiUrl}`);
+        
+        const itunesResponse = await axios.get(itunesApiUrl, { timeout: 10000 });
+        
+        if (!itunesResponse.data?.results?.length) {
+            throw new Error('iTunes API未返回有效结果');
+        }
+        
+        const feedUrl = itunesResponse.data.results[0].feedUrl;
+        if (!feedUrl) {
+            throw new Error('未找到RSS feed URL');
+        }
+        
+        console.log(`获取到RSS feed: ${feedUrl}`);
+        
+        // 解析RSS feed
+        const audioItems = await parseRSSFeed(feedUrl);
+        if (!audioItems?.length) {
+            throw new Error('RSS feed中未找到音频项目');
+        }
+        
+        console.log(`RSS中找到 ${audioItems.length} 个音频项目`);
+        
+        // 如果有episode ID，智能匹配特定episode
+        if (episodeId) {
+            console.log(`查找episode ID: ${episodeId}`);
             
-            // Apple Podcasts的RSS发现模式
-            const rssPatterns = [
-                /podcast-rss="([^"]+)"/i,
-                /"rssUrl":"([^"]+)"/i,
-                /"feedUrl":"([^"]+)"/i,
-                /data-podcast-rss="([^"]+)"/i,
-                /<link[^>]*type=["']application\/rss\+xml["'][^>]*href=["']([^"']+)["']/i
-            ];
-
-            for (const pattern of rssPatterns) {
-                const match = html.match(pattern);
-                if (match) {
-                    let rssUrl = match[1];
-                    // 解码URL
-                    rssUrl = rssUrl.replace(/\\u002F/g, '/').replace(/\\/g, '');
-                    
-                    console.log(`发现Apple Podcasts RSS: ${rssUrl}`);
-                    
-                    try {
-                        const audioItems = await parseRSSFeed(rssUrl);
-                        if (audioItems && audioItems.length > 0) {
-                            console.log('从Apple Podcasts RSS获取到音频链接');
-                            // 如果URL包含特定剧集ID，尝试匹配
-                            const episodeMatch = url.match(/i=(\d+)/);
-                            if (episodeMatch) {
-                                const episodeId = episodeMatch[1];
-                                const matchedItem = audioItems.find(item => 
-                                    item.audioUrl.includes(episodeId) || 
-                                    item.title.includes(episodeId)
-                                );
-                                if (matchedItem) {
-                                    return matchedItem.audioUrl;
-                                }
-                            }
-                            return audioItems[0].audioUrl; // 返回第一个音频
-                        }
-                    } catch (rssError) {
-                        console.log('RSS解析失败:', rssError.message);
-                        continue;
-                    }
-                }
+            // 尝试匹配特定episode
+            let matchedItem = audioItems.find(item => {
+                // 在RSS的各个字段中查找episode ID
+                return item.audioUrl?.includes(episodeId) || 
+                       item.guid?.includes(episodeId) ||
+                       item.title?.includes(episodeId) ||
+                       item.link?.includes(episodeId);
+            });
+            
+            if (matchedItem) {
+                console.log(`✅ 找到匹配episode: ${matchedItem.title}`);
+                return matchedItem.audioUrl;
+            } else {
+                console.warn(`⚠️ 未找到episode ${episodeId}的匹配项，使用最新episode`);
             }
-        } catch (pageError) {
-            console.log('Apple Podcasts页面解析失败:', pageError.message);
         }
-
-        // 方法2: 尝试构建iTunes RSS URL
-        try {
-            const podcastIdMatch = url.match(/id(\d+)/);
-            if (podcastIdMatch) {
-                const podcastId = podcastIdMatch[1];
-                const itunesRssUrl = `https://itunes.apple.com/lookup?id=${podcastId}&entity=podcast`;
-                
-                console.log(`尝试iTunes API: ${itunesRssUrl}`);
-                const itunesResponse = await axios.get(itunesRssUrl, { timeout: 10000 });
-                
-                if (itunesResponse.data && itunesResponse.data.results && itunesResponse.data.results.length > 0) {
-                    const feedUrl = itunesResponse.data.results[0].feedUrl;
-                    if (feedUrl) {
-                        console.log(`从iTunes API获取到RSS: ${feedUrl}`);
-                        const audioItems = await parseRSSFeed(feedUrl);
-                        if (audioItems && audioItems.length > 0) {
-                            return audioItems[0].audioUrl;
-                        }
-                    }
-                }
-            }
-        } catch (itunesError) {
-            console.log('iTunes API调用失败:', itunesError.message);
-        }
-
-        // 备用方案: 使用测试音频
-        console.warn('所有Apple Podcasts解析方法失败，使用测试音频');
-        return 'https://file-examples.com/storage/fe68c1f7d82c8645bb0b824/2017/11/file_example_MP3_700KB.mp3';
+        
+        // 返回第一个episode（最新）
+        const firstItem = audioItems[0];
+        console.log(`使用最新episode: ${firstItem.title}`);
+        return firstItem.audioUrl;
 
     } catch (error) {
-        console.error('Apple Podcasts解析错误:', error);
-        return 'https://file-examples.com/storage/fe68c1f7d82c8645bb0b824/2017/11/file_example_MP3_700KB.mp3';
+        console.error('Apple Podcasts解析失败:', error);
+        throw new Error(`Apple Podcasts音频解析失败: ${error.message}`);
     }
 }
 
@@ -179,29 +155,34 @@ async function extractXiaoyuzhouAudio(url) {
     try {
         console.log('处理小宇宙链接（RSS解析）...');
         
-        // 方法1: 尝试小宇宙专用API
+        // 方法1: 直接从网页抓取音频链接（替代需要认证的API）
         try {
-            const episodeIdMatch = url.match(/episode\/([a-f0-9]+)/);
-            if (episodeIdMatch) {
-                const episodeId = episodeIdMatch[1];
-                console.log(`小宇宙剧集ID: ${episodeId}`);
-                
-                // 尝试获取剧集信息
-                const apiResponse = await axios.get(`https://api.xiaoyuzhou.fm/v1/episode/${episodeId}`, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15',
-                        'Accept': 'application/json'
-                    },
-                    timeout: 10000
-                });
-                
-                if (apiResponse.data && apiResponse.data.media && apiResponse.data.media.source) {
-                    console.log('从小宇宙API获取到音频链接');
-                    return apiResponse.data.media.source.url;
-                }
+            console.log('从小宇宙网页抓取音频链接...');
+            const pageResponse = await axios.get(url, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                },
+                timeout: 15000
+            });
+            
+            // 从og:audio meta标签提取音频链接
+            const ogAudioMatch = pageResponse.data.match(/<meta\s+property="og:audio"\s+content="([^"]+)"/);
+            if (ogAudioMatch) {
+                const audioUrl = ogAudioMatch[1];
+                console.log('从小宇宙网页og:audio成功获取到音频链接');
+                return audioUrl;
             }
-        } catch (apiError) {
-            console.log('小宇宙API调用失败，尝试其他方法:', apiError.message);
+            
+            // 备用方案：从JSON-LD结构化数据提取
+            const jsonLdMatch = pageResponse.data.match(/"contentUrl":"([^"]+\.m4a)"/);
+            if (jsonLdMatch) {
+                const audioUrl = jsonLdMatch[1];
+                console.log('从小宇宙JSON-LD数据获取到音频链接');
+                return audioUrl;
+            }
+            
+        } catch (pageError) {
+            console.log('小宇宙网页抓取失败，尝试其他方法:', pageError.message);
         }
 
         // 方法2: 尝试RSS feed
@@ -232,13 +213,12 @@ async function extractXiaoyuzhouAudio(url) {
             console.log('RSS发现失败:', discoverError.message);
         }
 
-        // 备用方案: 使用测试音频
-        console.warn('所有小宇宙解析方法失败，使用测试音频');
-        return 'https://file-examples.com/storage/fe68c1f7d82c8645bb0b824/2017/11/file_example_MP3_700KB.mp3';
+        // 所有解析方法都失败了
+        throw new Error('无法从小宇宙获取音频链接，请检查链接是否有效');
 
     } catch (error) {
         console.error('小宇宙解析错误:', error);
-        return 'https://file-examples.com/storage/fe68c1f7d82c8645bb0b824/2017/11/file_example_MP3_700KB.mp3';
+        throw new Error(`小宇宙音频解析失败: ${error.message}`);
     }
 }
 
@@ -318,8 +298,7 @@ async function extractGenericPodcastAudio(url) {
 
     } catch (error) {
         console.error('通用播客解析错误:', error);
-        // 为了演示目的，返回一个示例音频
-        return 'https://file-examples.com/storage/fe68c1f7d82c8645bb0b824/2017/11/file_example_MP3_700KB.mp3';
+        throw new Error(`通用播客音频解析失败: ${error.message}`);
     }
 }
 
@@ -409,6 +388,9 @@ async function downloadAudioFile(audioUrl) {
 
     } catch (error) {
         console.error('下载音频文件错误:', error);
+        
+        // 不再使用假音频备用方案
+        
         throw new Error(`下载失败: ${error.message} / Download failed: ${error.message}`);
     }
 }

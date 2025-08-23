@@ -173,6 +173,9 @@ function showResultsContent(data) {
         summarySection.classList.add('hidden');
     }
     
+    // 显示下载按钮（如果有保存的文件）
+    showDownloadButtons(data.savedFiles || []);
+    
     // 重新启用提交按钮
     const submitBtn = document.getElementById('submitBtn');
     submitBtn.disabled = false;
@@ -198,8 +201,8 @@ function showError(errorMessage) {
 function validatePodcastUrl(url) {
     // Apple Podcasts URL pattern
     const applePodcastsPattern = /^https:\/\/podcasts\.apple\.com\//;
-    // 小宇宙 URL pattern (假设格式)
-    const xiaoyuzhouPattern = /^https:\/\/(www\.)?xiaoyuzhou\.fm\//;
+    // 小宇宙 URL pattern (修正域名)
+    const xiaoyuzhouPattern = /^https:\/\/(www\.)?xiaoyuzhoufm\.com\//;
     // 通用音频文件URL
     const audioFilePattern = /\.(mp3|wav|m4a|aac|ogg)(\?.*)?$/i;
     
@@ -241,3 +244,62 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+// 显示下载按钮
+function showDownloadButtons(savedFiles) {
+    const downloadSection = document.getElementById('downloadSection');
+    const downloadButtons = document.getElementById('downloadButtons');
+    
+    if (!savedFiles || savedFiles.length === 0) {
+        downloadSection.classList.add('hidden');
+        return;
+    }
+    
+    // 清空之前的按钮
+    downloadButtons.innerHTML = '';
+    
+    // 为每个保存的文件创建下载按钮
+    savedFiles.forEach(file => {
+        const button = document.createElement('a');
+        button.href = `/api/download/${file.filename}`;
+        button.download = file.filename;
+        button.className = 'flex items-center justify-between p-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-xl hover:from-green-600 hover:to-teal-600 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 no-underline';
+        
+        const iconMap = {
+            'transcript': '📝',
+            'summary': '🤖'
+        };
+        
+        const nameMap = {
+            'transcript': currentLanguage === 'zh' ? '转录文本' : 'Transcript',
+            'summary': currentLanguage === 'zh' ? 'AI总结' : 'AI Summary'
+        };
+        
+        const sizeText = formatFileSize(file.size);
+        
+        button.innerHTML = `
+            <div class="flex items-center">
+                <span class="text-2xl mr-3">${iconMap[file.type] || '📄'}</span>
+                <div>
+                    <div class="font-semibold">${nameMap[file.type] || file.type}</div>
+                    <div class="text-sm opacity-90">${sizeText}</div>
+                </div>
+            </div>
+            <span class="text-xl">⬇️</span>
+        `;
+        
+        downloadButtons.appendChild(button);
+    });
+    
+    // 显示下载区域
+    downloadSection.classList.remove('hidden');
+}
+
+// 格式化文件大小
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}

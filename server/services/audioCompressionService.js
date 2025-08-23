@@ -1,191 +1,155 @@
-const ffmpeg = require('fluent-ffmpeg');
-const ffmpegStatic = require('ffmpeg-static');
-const fs = require('fs');
+const fs = require('fs').promises;
 const path = require('path');
+const { exec } = require('child_process');
+const { promisify } = require('util');
 
-// 设置FFmpeg路径
-ffmpeg.setFfmpegPath(ffmpegStatic);
+const execAsync = promisify(exec);
 
 /**
- * 压缩音频文件以符合OpenAI Whisper API限制
+ * 音频分割和压缩服务
+ * 使用系统级 ffmpeg 进行高效音频处理
+ */
+
+/**
+ * 音频处理：本地Faster-Whisper模式，直接处理完整文件
  * @param {string} inputPath - 输入音频文件路径
- * @param {number} targetSizeMB - 目标文件大小(MB)，默认20MB
- * @returns {Promise<string>} 压缩后的文件路径
- */
-async function compressAudioForWhisper(inputPath, targetSizeMB = 20) {
-    try {
-        console.log(`开始压缩音频文件: ${inputPath}`);
-        
-        // 检查输入文件是否存在
-        if (!fs.existsSync(inputPath)) {
-            throw new Error('输入音频文件不存在');
-        }
-
-        // 获取原始文件信息
-        const inputStats = fs.statSync(inputPath);
-        const inputSizeMB = inputStats.size / (1024 * 1024);
-        
-        console.log(`原始文件大小: ${inputSizeMB.toFixed(2)}MB`);
-
-        // 如果文件已经小于目标大小，直接返回
-        if (inputSizeMB <= targetSizeMB) {
-            console.log('文件大小已符合要求，无需压缩');
-            return inputPath;
-        }
-
-        // 生成压缩后的文件路径
-        const outputPath = inputPath.replace(/\.[^/.]+$/, '_compressed.mp3');
-
-        // 获取音频信息用于计算压缩参数
-        const audioInfo = await getAudioInfo(inputPath);
-        console.log('音频信息:', audioInfo);
-
-        // 计算目标比特率
-        const targetBitrate = calculateTargetBitrate(audioInfo, targetSizeMB);
-        console.log(`目标比特率: ${targetBitrate}k`);
-
-        // 执行压缩
-        await compressAudio(inputPath, outputPath, targetBitrate);
-
-        // 验证压缩结果
-        const outputStats = fs.statSync(outputPath);
-        const outputSizeMB = outputStats.size / (1024 * 1024);
-        
-        console.log(`压缩完成! 新文件大小: ${outputSizeMB.toFixed(2)}MB`);
-        console.log(`压缩率: ${((inputSizeMB - outputSizeMB) / inputSizeMB * 100).toFixed(1)}%`);
-
-        // 删除原始文件以节省空间
-        try {
-            fs.unlinkSync(inputPath);
-            console.log('已删除原始文件');
-        } catch (deleteError) {
-            console.warn('删除原始文件失败:', deleteError.message);
-        }
-
-        return outputPath;
-
-    } catch (error) {
-        console.error('音频压缩错误:', error);
-        throw new Error(`音频压缩失败: ${error.message}`);
-    }
-}
-
-/**
- * 获取音频文件信息
- */
-function getAudioInfo(filePath) {
-    return new Promise((resolve, reject) => {
-        ffmpeg.ffprobe(filePath, (err, metadata) => {
-            if (err) {
-                reject(err);
-                return;
-            }
-
-            const audioStream = metadata.streams.find(stream => stream.codec_type === 'audio');
-            if (!audioStream) {
-                reject(new Error('找不到音频流'));
-                return;
-            }
-
-            resolve({
-                duration: parseFloat(metadata.format.duration) || 0,
-                bitrate: parseInt(audioStream.bit_rate) || 0,
-                sampleRate: parseInt(audioStream.sample_rate) || 44100,
-                channels: parseInt(audioStream.channels) || 2,
-                codec: audioStream.codec_name || 'unknown'
-            });
-        });
-    });
-}
-
-/**
- * 计算目标比特率
- */
-function calculateTargetBitrate(audioInfo, targetSizeMB) {
-    const { duration } = audioInfo;
-    
-    if (!duration || duration <= 0) {
-        // 如果无法获取时长，使用保守的比特率
-        return 64; // 64kbps
-    }
-
-    // 目标文件大小(bits) = 目标大小(MB) * 8 * 1024 * 1024
-    const targetSizeBits = targetSizeMB * 8 * 1024 * 1024;
-    
-    // 计算比特率 = 文件大小(bits) / 时长(秒)
-    let targetBitrate = Math.floor(targetSizeBits / duration);
-    
-    // 设置合理的比特率范围
-    // 最低32kbps（保证基本质量），最高128kbps（避免文件过大）
-    targetBitrate = Math.max(32, Math.min(128, targetBitrate));
-    
-    // 为了安全起见，减少10%的比特率
-    targetBitrate = Math.floor(targetBitrate * 0.9);
-    
-    return targetBitrate;
-}
-
-/**
- * 执行音频压缩
- */
-function compressAudio(inputPath, outputPath, bitrate) {
-    return new Promise((resolve, reject) => {
-        ffmpeg(inputPath)
-            .audioCodec('mp3')           // 使用MP3编码
-            .audioBitrate(`${bitrate}k`) // 设置比特率
-            .audioChannels(1)            // 转为单声道（语音转录通常不需要立体声）
-            .audioFrequency(16000)       // 降低采样率到16kHz（Whisper推荐）
-            .format('mp3')               // 输出格式
-            .on('start', (commandLine) => {
-                console.log('FFmpeg命令:', commandLine);
-            })
-            .on('progress', (progress) => {
-                if (progress.percent) {
-                    console.log(`压缩进度: ${Math.round(progress.percent)}%`);
-                }
-            })
-            .on('end', () => {
-                console.log('音频压缩完成');
-                resolve();
-            })
-            .on('error', (err) => {
-                console.error('FFmpeg错误:', err);
-                reject(err);
-            })
-            .save(outputPath);
-    });
-}
-
-/**
- * 智能音频压缩 - 根据文件大小自动选择压缩策略
+ * @returns {Promise<Array>} - 返回音频文件路径数组
  */
 async function smartCompress(inputPath) {
     try {
-        const stats = fs.statSync(inputPath);
+        const stats = await fs.stat(inputPath);
         const sizeMB = stats.size / (1024 * 1024);
+
+        console.log(`🎵 音频文件大小: ${sizeMB.toFixed(2)}MB`);
+        console.log('🎤 本地Faster-Whisper模式，支持大文件处理，无需分割');
         
-        if (sizeMB <= 25) {
-            // 文件小于25MB，无需压缩
-            return inputPath;
-        } else if (sizeMB <= 50) {
-            // 文件在25-50MB，轻度压缩
-            return await compressAudioForWhisper(inputPath, 20);
-        } else if (sizeMB <= 100) {
-            // 文件在50-100MB，中度压缩
-            return await compressAudioForWhisper(inputPath, 18);
-        } else {
-            // 文件超过100MB，重度压缩
-            return await compressAudioForWhisper(inputPath, 15);
-        }
+        // 本地Whisper模式：直接处理完整文件，无大小限制
+        return [inputPath];
+
     } catch (error) {
-        console.error('智能压缩失败:', error);
+        console.error('❌ 音频处理失败:', error);
         throw error;
     }
 }
 
-module.exports = {
-    compressAudioForWhisper,
-    smartCompress,
-    getAudioInfo
-};
+/**
+ * 分割音频文件为10分钟片段
+ * @param {string} inputPath - 输入音频文件路径
+ * @param {number} sizeMB - 文件大小（MB）
+ * @returns {Promise<Array>} - 返回分割后的音频片段路径数组
+ */
+async function splitAudioFile(inputPath, sizeMB) {
+    try {
+        const outputDir = path.dirname(inputPath);
+        const baseName = path.basename(inputPath, path.extname(inputPath));
+        const inputExt = path.extname(inputPath); // 保持原始格式
+        const outputPattern = path.join(outputDir, `${baseName}_segment_%03d${inputExt}`);
 
+        console.log(`📂 输出目录: ${outputDir}`);
+        console.log(`🎯 分割模式: 每段10分钟`);
+        
+        // 使用 ffmpeg 进行分割并重新编码，确保片段完整性
+        const ffmpegCommand = `ffmpeg -i "${inputPath}" -f segment -segment_time 600 -c:a aac -b:a 128k "${outputPattern}"`;
+        
+        console.log(`⚙️  执行命令: ${ffmpegCommand}`);
+        console.log(`⏳ 正在分割音频文件（重新编码以确保兼容性）...`);
+
+        const { stdout, stderr } = await execAsync(ffmpegCommand);
+        
+        if (stderr && !stderr.includes('video:0kB audio:')) {
+            console.warn('⚠️ FFmpeg 警告:', stderr);
+        }
+
+        // 查找生成的分割文件
+        const segmentFiles = await findSegmentFiles(outputDir, baseName, inputExt);
+        
+        console.log(`✅ 音频分割完成！`);
+        console.log(`📊 原文件: ${sizeMB.toFixed(2)}MB`);
+        console.log(`🎬 分割为: ${segmentFiles.length} 个片段`);
+        
+        // 显示每个片段的信息
+        for (let i = 0; i < segmentFiles.length; i++) {
+            const segmentStats = await fs.stat(segmentFiles[i]);
+            const segmentSizeMB = segmentStats.size / (1024 * 1024);
+            console.log(`   📄 片段 ${i + 1}: ${segmentSizeMB.toFixed(2)}MB - ${path.basename(segmentFiles[i])}`);
+        }
+
+        return segmentFiles;
+
+    } catch (error) {
+        console.error('❌ 音频分割失败:', error);
+        throw new Error(`音频分割失败: ${error.message}`);
+    }
+}
+
+/**
+ * 查找分割后的音频文件
+ * @param {string} outputDir - 输出目录
+ * @param {string} baseName - 原文件基础名称
+ * @param {string} extension - 文件扩展名
+ * @returns {Promise<Array>} - 分割文件路径数组
+ */
+async function findSegmentFiles(outputDir, baseName, extension) {
+    try {
+        const files = await fs.readdir(outputDir);
+        const segmentFiles = files
+            .filter(file => file.startsWith(`${baseName}_segment_`) && file.endsWith(extension))
+            .map(file => path.join(outputDir, file))
+            .sort(); // 确保顺序正确
+
+        if (segmentFiles.length === 0) {
+            throw new Error('未找到分割后的音频文件');
+        }
+
+        return segmentFiles;
+    } catch (error) {
+        console.error('❌ 查找分割文件失败:', error);
+        throw error;
+    }
+}
+
+/**
+ * 清理临时分割文件
+ * @param {Array} segmentFiles - 分割文件路径数组
+ */
+async function cleanupSegmentFiles(segmentFiles) {
+    try {
+        console.log(`🧹 清理 ${segmentFiles.length} 个临时分割文件...`);
+        
+        for (const file of segmentFiles) {
+            try {
+                await fs.unlink(file);
+                console.log(`   ✅ 已删除: ${path.basename(file)}`);
+            } catch (error) {
+                console.warn(`   ⚠️ 删除失败: ${path.basename(file)} - ${error.message}`);
+            }
+        }
+        
+        console.log('✅ 临时文件清理完成');
+    } catch (error) {
+        console.error('❌ 清理临时文件失败:', error);
+    }
+}
+
+/**
+ * 获取音频文件时长（秒）
+ * @param {string} filePath - 音频文件路径
+ * @returns {Promise<number>} - 音频时长（秒）
+ */
+async function getAudioDuration(filePath) {
+    try {
+        const command = `ffprobe -v quiet -show_entries format=duration -of csv=p=0 "${filePath}"`;
+        const { stdout } = await execAsync(command);
+        return parseFloat(stdout.trim());
+    } catch (error) {
+        console.warn(`⚠️ 获取音频时长失败: ${error.message}`);
+        return 0;
+    }
+}
+
+module.exports = {
+    smartCompress,
+    splitAudioFile,
+    cleanupSegmentFiles,
+    getAudioDuration
+};

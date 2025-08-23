@@ -214,7 +214,7 @@ async function getXiaoyuzhouRSS(episodeUrl) {
         console.log(`小宇宙剧集ID: ${episodeId}`);
 
         // 尝试获取剧集API信息
-        const apiUrl = `https://api.xiaoyuzhou.fm/v1/episode/${episodeId}`;
+        const apiUrl = `https://api.xiaoyuzhoufm.com/v1/episode/${episodeId}`;
         
         try {
             const response = await axios.get(apiUrl, {
