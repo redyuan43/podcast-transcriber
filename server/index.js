@@ -81,42 +81,16 @@ app.post('/api/process-podcast', async (req, res) => {
         
         // 步骤3: 使用本地Whisper处理音频
         console.log(`🤖 本地转录处理 ${audioFiles.length} 个音频文件...`);
-        const result = await processAudioWithOpenAI(audioFiles, shouldSummarize, outputLanguage);
+        const result = await processAudioWithOpenAI(audioFiles, shouldSummarize, outputLanguage, tempDir);
 
-        // 步骤4: 保存转录文本和总结到文件
-        const timestamp = Date.now();
-        const filePrefix = `podcast_${timestamp}`;
-        const savedFiles = [];
+        // 步骤4: 获取保存的文件信息
+        const savedFiles = result.savedFiles || [];
+        console.log(`✅ 处理完成，共保存 ${savedFiles.length} 个文件`);
         
-        console.log('💾 保存转录结果到文件...');
-        
-        // 保存转录文本
-        if (result.transcript) {
-            const transcriptFileName = `${filePrefix}_transcript.txt`;
-            const transcriptPath = path.join(tempDir, transcriptFileName);
-            fs.writeFileSync(transcriptPath, result.transcript, 'utf8');
-            savedFiles.push({
-                type: 'transcript',
-                filename: transcriptFileName,
-                path: transcriptPath,
-                size: fs.statSync(transcriptPath).size
-            });
-            console.log(`📄 转录文本已保存: ${transcriptFileName}`);
-        }
-        
-        // 保存AI总结（如果有）
-        if (result.summary) {
-            const summaryFileName = `${filePrefix}_summary.txt`;
-            const summaryPath = path.join(tempDir, summaryFileName);
-            fs.writeFileSync(summaryPath, result.summary, 'utf8');
-            savedFiles.push({
-                type: 'summary', 
-                filename: summaryFileName,
-                path: summaryPath,
-                size: fs.statSync(summaryPath).size
-            });
-            console.log(`📋 AI总结已保存: ${summaryFileName}`);
-        }
+        // 打印保存的文件详情
+        savedFiles.forEach(file => {
+            console.log(`📁 ${file.type}: ${file.filename} (${(file.size/1024).toFixed(1)}KB)`);
+        });
 
         // 步骤5: 清理音频临时文件
         try {
@@ -145,7 +119,7 @@ app.post('/api/process-podcast', async (req, res) => {
             success: true,
             data: {
                 ...result,
-                savedFiles: savedFiles // 添加保存的文件信息
+                savedFiles: savedFiles
             }
         });
 
@@ -159,10 +133,18 @@ app.post('/api/process-podcast', async (req, res) => {
     }
 });
 
-// 文件下载端点
-app.get('/api/download/:filename', (req, res) => {
+// 本地文件处理端点
+app.post('/api/process-local-file', async (req, res) => {
     try {
-        const filename = req.params.filename;
+        const { filename, operation = 'transcribe_only', outputLanguage = 'zh' } = req.body;
+        
+        if (!filename) {
+            return res.status(400).json({
+                success: false,
+                error: '缺少文件名参数'
+            });
+        }
+        
         const filePath = path.join(tempDir, filename);
         
         // 安全检查：确保文件在temp目录内
@@ -181,13 +163,102 @@ app.get('/api/download/:filename', (req, res) => {
             });
         }
         
+        console.log(`📂 处理本地文件: ${filename}`);
+        console.log(`📋 处理模式: ${operation === 'transcribe_summarize' ? '转录+总结' : '仅转录'}`);
+        
+        const shouldSummarize = operation === 'transcribe_summarize';
+        
+        // 使用本地Whisper处理音频
+        console.log(`🤖 本地转录处理文件: ${filename}`);
+        const result = await processAudioWithOpenAI([filePath], shouldSummarize, outputLanguage, tempDir);
+
+        // 获取保存的文件信息
+        const savedFiles = result.savedFiles || [];
+        console.log(`✅ 处理完成，共保存 ${savedFiles.length} 个文件`);
+        
+        // 打印保存的文件详情
+        savedFiles.forEach(file => {
+            console.log(`📁 ${file.type}: ${file.filename} (${(file.size/1024).toFixed(1)}KB)`);
+        });
+        
+        // 返回结果
+        res.json({
+            success: true,
+            data: {
+                ...result,
+                savedFiles: savedFiles
+            }
+        });
+        
+    } catch (error) {
+        console.error('本地文件处理失败:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || '本地文件处理失败'
+        });
+    }
+});
+
+// 获取temp目录文件列表端点
+app.get('/api/temp-files', (req, res) => {
+    try {
+        const files = fs.readdirSync(tempDir)
+            .filter(file => file.endsWith('.m4a') || file.endsWith('.mp3') || file.endsWith('.wav'))
+            .map(file => {
+                const filePath = path.join(tempDir, file);
+                const stats = fs.statSync(filePath);
+                return {
+                    filename: file,
+                    size: stats.size,
+                    created: stats.ctime,
+                    modified: stats.mtime
+                };
+            })
+            .sort((a, b) => b.modified - a.modified);
+            
+        res.json({
+            success: true,
+            files: files
+        });
+        
+    } catch (error) {
+        console.error('获取文件列表失败:', error);
+        res.status(500).json({
+            success: false,
+            error: '获取文件列表失败'
+        });
+    }
+});
+
+// 文件下载端点
+app.get('/api/download/:filename', (req, res) => {
+    try {
+        const filename = req.params.filename;
+        const filePath = path.join(tempDir, filename);
+
+        // 安全检查：确保文件在temp目录内
+        if (!filePath.startsWith(tempDir)) {
+            return res.status(400).json({
+                success: false,
+                error: '无效的文件路径'
+            });
+        }
+
+        // 检查文件是否存在
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({
+                success: false,
+                error: '文件未找到'
+            });
+        }
+
         // 设置下载响应头
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        
+
         // 发送文件
         res.sendFile(filePath);
-        
+
     } catch (error) {
         console.error('文件下载失败:', error);
         res.status(500).json({

@@ -6,7 +6,7 @@ A professional-grade bilingual podcast transcription and summarization platform 
 
 ## 🌟 Project Overview
 
-Podcast Extractor is a full-stack web application designed to bridge the gap between audio content and text accessibility. It automatically processes podcast episodes from various platforms, handles large audio files through intelligent segmentation, and delivers accurate transcriptions with meaningful summaries in multiple languages.
+Podcast Extractor is a full-stack web application designed to bridge the gap between audio content and text accessibility. It automatically processes podcast episodes from various platforms, and delivers accurate transcriptions with meaningful summaries in multiple languages.
 
 ### Key Capabilities
 
@@ -15,7 +15,7 @@ Podcast Extractor is a full-stack web application designed to bridge the gap bet
 - **🔗 Multi-Platform Support**: Extract audio from Apple Podcasts, Xiaoyuzhou, RSS feeds, and direct audio URLs
 - **🎵 Intelligent Audio Processing**: Direct processing of large files without size limitations
 - **🤖 AI-Powered Optimization**: Seamless text continuity optimization and structured summarization
-- **🔒 Privacy-First**: Complete local processing with no data uploads
+- **🔒 Privacy-First**: Local transcription with minimal data sharing (only text summaries use external AI)
 - **🌍 Bilingual Interface**: Native Chinese and English support with dynamic language switching
 - **📱 Responsive Design**: Modern, mobile-first UI built with TailwindCSS
 
@@ -84,17 +84,25 @@ podcast-to-text/
 ├── 📂 server/                          # Backend Services
 │   ├── 📄 index.js                     # Express server & API routing
 │   ├── 📄 whisper_transcribe.py        # Local Faster-Whisper transcription
-│   └── 📂 services/                    # Core business logic
-│       ├── 📄 openaiService.js         # AI processing & optimization
-│       ├── 📄 podcastService.js        # Podcast extraction & parsing
-│       ├── 📄 audioCompressionService.js # Audio processing management
-│       └── 📄 rssParser.js             # RSS feed processing
+│   ├── 📂 assets/                      # Test assets
+│   │   └── 📄 test_audio.mp3           # Sample audio for testing
+│   ├── 📂 services/                    # Core business logic
+│   │   ├── 📄 openaiService.js         # AI processing & optimization
+│   │   ├── 📄 podcastService.js        # Podcast extraction & parsing
+│   │   ├── 📄 audioCompressionService.js # Audio processing management
+│   │   └── 📄 rssParser.js             # RSS feed processing
+│   └── 📂 temp/                        # Temporary audio & text storage (auto-created)
 │
 ├── 📄 package.json                     # Dependencies & scripts
-├── 📄 .env.example                     # Environment configuration template
+├── 📄 package-lock.json                # Dependency lock file
+├── 📄 .env                            # Environment configuration (create from .env.example)
+├── 📄 .gitignore                       # Git ignore rules
 ├── 📄 README.md                        # English documentation
 ├── 📄 README_zh.md                     # Chinese documentation
-└── 📂 temp/                           # Temporary audio storage (auto-created)
+├── 📄 PLATFORM_SUPPORT.md             # Platform compatibility guide
+├── 📄 start.sh                        # Production start script
+├── 📄 quick-start.sh                   # Quick setup script
+└── 📄 fix-cursor-terminal.md           # IDE troubleshooting guide
 ```
 
 ## 🚀 Quick Start
@@ -171,7 +179,7 @@ SEGMENT_DURATION_SECONDS=600
 - **Direct Processing**: Handle large audio files without size limitations or segmentation
 - **Faster-Whisper Engine**: 8.4x real-time processing speed with 99.5% accuracy
 - **Model Flexibility**: Support for tiny, base, small, medium, and large-v3 models
-- **Privacy Focused**: Complete local processing with no data uploads
+- **Privacy Focused**: Audio transcription is completely local, only text summaries use external AI
 - **Memory Efficient**: Optimized for personal devices and workstations
 
 ### AI Text Optimization
@@ -200,7 +208,7 @@ Process podcast transcription and summarization.
 ```json
 {
   "url": "https://podcasts.apple.com/us/podcast/...",
-  "operation": "transcribe_and_summarize", // or "transcribe_only"
+  "operation": "transcribe_summarize", // or "transcribe_only"
   "audioLanguage": "auto", // or specific language code
   "outputLanguage": "en" // output language preference
 }
@@ -212,7 +220,7 @@ Process podcast transcription and summarization.
   "success": true,
   "data": {
     "transcript": "Optimized transcription text...",
-    "summary": "AI-generated summary...", // only for transcribe_and_summarize
+    "summary": "AI-generated summary...", // only for transcribe_summarize
     "language": "zh",
     "savedFiles": [
       {
@@ -343,11 +351,12 @@ The core transcription functionality works completely offline:
 
 ## 🔒 Security & Privacy
 
-- **Complete Local Processing**: Audio transcription never leaves your device
-- **Minimal External Calls**: Only summarization requires internet access
+- **Local Audio Processing**: Audio transcription never leaves your device
+- **Minimal External Calls**: Only text summarization requires internet access (no audio uploaded)
 - **No Data Persistence**: Audio files are processed and immediately deleted
 - **Secure API Handling**: Environment variable protection for sensitive keys
 - **Input Validation**: Comprehensive URL and parameter sanitization
+- **Transparent Data Flow**: Audio stays local, only generated text may be sent for summarization
 
 ## 📄 License
 

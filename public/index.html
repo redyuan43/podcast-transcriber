@@ -28,6 +28,32 @@
         .loading {
             animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
+        .loading-pulse {
+            animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        .loading-shine {
+            animation: shine 2s ease-in-out infinite;
+        }
+        
+        @keyframes shine {
+            0% { transform: translateX(-100%); }
+            50% { transform: translateX(100%); }
+            100% { transform: translateX(100%); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: .5;
+            }
+        }
+        
+        /* 进度条平滑过渡 */
+        #progressBar {
+            transition: width 0.5s ease-out;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
@@ -152,9 +178,65 @@
                 <!-- Loading State -->
                 <div id="loadingState" class="text-center py-12">
                     <div class="loading text-6xl mb-4">🎧</div>
-                    <p class="text-lg text-slate-600" id="loadingText">正在处理您的播客...</p>
-                    <div class="mt-4 bg-slate-200 rounded-full h-2">
-                        <div class="bg-gradient-to-r from-blue-500 to-cyan-500 h-2 rounded-full loading" style="width: 60%"></div>
+                    <p class="text-lg text-slate-600 mb-2" id="loadingText">正在处理您的播客...</p>
+                    
+                    <!-- 详细进度显示 -->
+                    <div class="max-w-md mx-auto mt-6">
+                        <!-- 进度条容器 -->
+                        <div class="bg-slate-200 rounded-full h-4 relative overflow-hidden shadow-inner">
+                            <div 
+                                id="progressBar"
+                                class="bg-gradient-to-r from-blue-500 to-cyan-500 h-4 rounded-full transition-all duration-300 ease-out shadow-sm"
+                                style="width: 0%"
+                                role="progressbar"
+                                aria-valuenow="0"
+                                aria-valuemin="0"
+                                aria-valuemax="100"
+                            ></div>
+                            <!-- 进度条光效 -->
+                            <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-20 loading-shine"></div>
+                        </div>
+                        
+                        <!-- 进度文本 -->
+                        <div class="flex justify-between items-center mt-3 text-sm text-slate-600">
+                            <span id="progressText" class="font-semibold text-blue-600">0%</span>
+                            <span id="estimatedTime" class="text-slate-500">预计需要 10-15 分钟...</span>
+                        </div>
+                        
+                        <!-- 处理步骤提示 -->
+                        <div class="mt-4 text-xs text-slate-500 space-y-1">
+                            <div class="flex items-center justify-center space-x-2">
+                                <div class="w-2 h-2 rounded-full bg-green-400"></div>
+                                <span id="stepDownloadText">下载音频文件</span>
+                            </div>
+                            <div class="flex items-center justify-center space-x-2">
+                                <div class="w-2 h-2 rounded-full bg-blue-400 loading-pulse"></div>
+                                <span id="stepTranscribeText">AI语音转录中...</span>
+                            </div>
+                            <div class="flex items-center justify-center space-x-2">
+                                <div class="w-2 h-2 rounded-full bg-slate-300"></div>
+                                <span id="stepSummarizeText">生成智能总结</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 温馨提示 -->
+                    <div class="mt-6 max-w-lg mx-auto">
+                        <div class="bg-blue-50 border-l-4 border-blue-400 p-4 text-sm text-left">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <span class="text-lg">💡</span>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-blue-800">
+                                        <strong id="processingTipsText">处理中，请耐心等待：</strong><br/>
+                                        • <span id="tipLargeFileText">大文件需要更长时间处理</span><br/>
+                                        • <span id="tipKeepOpenText">页面请保持打开状态</span><br/>
+                                        • <span id="tipAutoShowText">处理完成后会自动显示结果</span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

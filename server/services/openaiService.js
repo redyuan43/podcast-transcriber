@@ -25,7 +25,7 @@ const openai = new OpenAI({
  * @param {string} outputLanguage - 输出语言
  * @returns {Promise<Object>} - 处理结果
  */
-async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outputLanguage = 'zh') {
+async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outputLanguage = 'zh', tempDir = null) {
     try {
         console.log(`🤖 开始音频处理 - OpenAI`);
         
@@ -34,30 +34,118 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
         console.log(`📄 处理文件数量: ${files.length}`);
 
         let transcript = '';
+        let savedFiles = [];
 
         if (files.length === 1) {
-            // 单文件处理
+            // 单文件处理 - Python脚本总是保存转录文本
             console.log(`🎵 单文件处理模式`);
-            transcript = await transcribeAudio(files[0], true); // 自动检测语言
+            
+            // Python脚本转录并直接保存转录文本
+            const scriptPath = path.join(__dirname, '..', 'whisper_transcribe.py');
+            const timestamp = Date.now();
+            const filePrefix = `podcast_${timestamp}`;
+            const command = `python3 "${scriptPath}" "${files[0]}" --model ${process.env.WHISPER_MODEL || 'base'} --save-transcript "${tempDir}" --file-prefix "${filePrefix}"`;
+            
+            console.log(`🎤 Python脚本转录并保存: ${path.basename(files[0])}`);
+            console.log(`⚙️ 执行命令: ${command}`);
+            
+            const { stdout, stderr } = await execAsync(command, {
+                maxBuffer: 1024 * 1024 * 10,
+                timeout: 600000
+            });
+            
+            if (stderr && stderr.trim()) {
+                console.log(`🔧 Whisper日志: ${stderr.trim()}`);
+            }
+            
+            const result = JSON.parse(stdout);
+            
+            if (!result.success) {
+                throw new Error(result.error || '转录失败');
+            }
+            
+            transcript = result.text || '';
+            savedFiles = result.savedFiles || [];
+            
+            console.log(`✅ Python脚本转录完成: ${transcript.length} 字符`);
+            console.log(`💾 Python脚本保存了 ${savedFiles.length} 个文件`);
+
+            // 对转录文本进行智能优化（错别字修正+格式化）
+            console.log(`📝 开始智能优化转录文本...`);
+            const optimizedTranscript = await formatTranscriptText(transcript, outputLanguage);
+            
+            // 保存优化后的文本（覆盖原文件）
+            if (savedFiles.length > 0) {
+                const transcriptFile = savedFiles.find(f => f.type === 'transcript');
+                if (transcriptFile && fs.existsSync(transcriptFile.path)) {
+                    fs.writeFileSync(transcriptFile.path, optimizedTranscript, 'utf8');
+                    console.log(`📄 优化文本已保存: ${transcriptFile.filename}`);
+                }
+            }
+            
+            // 更新结果
+            transcript = optimizedTranscript;
+            
+            // 如果需要总结，使用优化后的转录文本进行AI总结
+            if (shouldSummarize) {
+                console.log(`📝 开始生成总结...`);
+                const summary = await generateSummary(transcript, outputLanguage);
+                
+                // 保存AI总结
+                const summaryFileName = `${filePrefix}_summary.txt`;
+                const summaryPath = path.join(tempDir, summaryFileName);
+                fs.writeFileSync(summaryPath, summary, 'utf8');
+                
+                savedFiles.push({
+                    type: 'summary',
+                    filename: summaryFileName,
+                    path: summaryPath,
+                    size: fs.statSync(summaryPath).size
+                });
+                
+                console.log(`📋 AI总结已保存: ${summaryFileName}`);
+                
+                // 更新result中的summary
+                result.summary = summary;
+            }
+            // 返回处理后的结果
+            return {
+                transcript: transcript,
+                summary: result.summary || null, // 如果有总结则包含
+                language: outputLanguage,
+                savedFiles: savedFiles
+            };
+            
         } else {
             // 多文件并发处理
             console.log(`🎬 多文件并发处理模式`);
-            transcript = await transcribeMultipleAudios(files, outputLanguage);
+            const transcribeResult = await transcribeMultipleAudios(files, outputLanguage, !shouldSummarize && tempDir, tempDir);
+            
+            // 处理返回值（可能是字符串或对象）
+            let transcript;
+            let savedFiles = [];
+            
+            if (typeof transcribeResult === 'object' && transcribeResult.text) {
+                transcript = transcribeResult.text;
+                savedFiles = transcribeResult.savedFiles || [];
+            } else {
+                transcript = transcribeResult;
+            }
+            
+            let finalResult = {
+                transcript: transcript,
+                language: outputLanguage,
+                savedFiles: savedFiles
+            };
+
+            if (shouldSummarize) {
+                console.log(`📝 开始生成总结...`);
+                const summary = await generateSummary(transcript, outputLanguage);
+                finalResult.summary = summary;
+            }
+            
+            return finalResult;
         }
-
-        let result = {
-            transcript: transcript,
-            language: outputLanguage
-        };
-
-        if (shouldSummarize) {
-            console.log(`📝 开始生成总结...`);
-            const summary = await generateSummary(transcript, outputLanguage);
-            result.summary = summary;
-        }
-
-        console.log(`✅ 音频处理完成`);
-        return result;
 
     } catch (error) {
         console.error('❌ OpenAI处理失败:', error);
@@ -71,13 +159,14 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
  * @param {string} outputLanguage - 总结输出语言（不影响转录语言）
  * @returns {Promise<string>} - 优化后的完整转录文本
  */
-async function transcribeMultipleAudios(audioFiles, outputLanguage) {
+async function transcribeMultipleAudios(audioFiles, outputLanguage, shouldSaveDirectly = false, tempDir = null) {
     try {
         console.log(`🔄 开始串行转录 ${audioFiles.length} 个音频片段（避免API过载）...`);
         
         // 分批处理音频片段，避免并发过载，使用重试机制
         const batchSize = 1; // 每批最多1个文件 - 完全串行处理
         const transcriptions = [];
+        let allSavedFiles = []; // 收集所有保存的文件
         
         for (let i = 0; i < audioFiles.length; i += batchSize) {
             const batch = audioFiles.slice(i, i + batchSize);
@@ -91,11 +180,21 @@ async function transcribeMultipleAudios(audioFiles, outputLanguage) {
                 while (retryCount <= maxRetries) {
                     try {
                         console.log(`   🎵 开始转录片段 ${index + 1}/${audioFiles.length}: ${path.basename(file)} ${retryCount > 0 ? `(重试 ${retryCount})` : ''}`);
-                        const result = await transcribeAudio(file, true); // 始终自动检测语言
-                        console.log(`   ✅ 片段 ${index + 1} 转录完成 (${result.length} 字符)`);
+                        
+                        // 使用新的本地转录函数，支持保存参数
+                        const result = await transcribeAudioLocal(file, null, shouldSaveDirectly, tempDir);
+                        const transcript = typeof result === 'string' ? result : result.text || '';
+                        
+                        console.log(`   ✅ 片段 ${index + 1} 转录完成 (${transcript.length} 字符)`);
+                        
+                        // 如果有保存的文件信息，收集起来
+                        if (typeof result === 'object' && result.savedFiles) {
+                            allSavedFiles = allSavedFiles.concat(result.savedFiles);
+                        }
+                        
                         return {
                             index,
-                            text: result,
+                            text: transcript,
                             filename: path.basename(file),
                             success: true
                         };
@@ -165,6 +264,14 @@ async function transcribeMultipleAudios(audioFiles, outputLanguage) {
         
         console.log(`✨ 文本优化完成: ${optimizedTranscript.length} 字符`);
         
+        // 如果有保存文件，返回对象；否则返回字符串（保持向后兼容）
+        if (allSavedFiles.length > 0) {
+            return {
+                text: optimizedTranscript,
+                savedFiles: allSavedFiles
+            };
+        }
+        
         return optimizedTranscript;
 
     } catch (error) {
@@ -179,7 +286,7 @@ async function transcribeMultipleAudios(audioFiles, outputLanguage) {
  * @param {string} language - 语言代码（可选）
  * @returns {Promise<string>} - 转录文本
  */
-async function transcribeAudioLocal(audioPath, language = null) {
+async function transcribeAudioLocal(audioPath, language = null, shouldSaveDirectly = false, tempDir = null) {
     try {
         console.log(`🎤 本地转录: ${path.basename(audioPath)}`);
         
@@ -189,6 +296,14 @@ async function transcribeAudioLocal(audioPath, language = null) {
         
         if (language) {
             command += ` --language ${language}`;
+        }
+        
+        // 如果需要直接保存转录文本
+        if (shouldSaveDirectly && tempDir) {
+            const timestamp = Date.now();
+            const filePrefix = `podcast_${timestamp}`;
+            command += ` --save-transcript "${tempDir}" --file-prefix "${filePrefix}"`;
+            console.log(`💾 将直接保存转录文本到: ${tempDir}`);
         }
         
         console.log(`⚙️ 执行命令: ${command}`);
@@ -213,6 +328,16 @@ async function transcribeAudioLocal(audioPath, language = null) {
         const transcript = result.text || '';
         console.log(`✅ 本地转录完成: ${transcript.length} 字符`);
         console.log(`📊 处理时间: ${result.processing_time}秒, 检测语言: ${result.language} (${(result.language_probability * 100).toFixed(1)}%)`);
+        
+        // 如果保存了文件，返回完整结果对象；否则只返回转录文本
+        if (shouldSaveDirectly && result.savedFiles && result.savedFiles.length > 0) {
+            return {
+                text: transcript,
+                savedFiles: result.savedFiles,
+                language: result.language,
+                processing_time: result.processing_time
+            };
+        }
         
         return transcript;
         
@@ -243,6 +368,85 @@ async function transcribeAudio(audioPath, autoDetect = true) {
 }
 
 
+
+/**
+ * 优化转录文本：修正错误、改善通顺度和智能分段
+ * @param {string} rawTranscript - 原始转录文本
+ * @param {string} outputLanguage - 输出语言（仅影响提示语言，不改变内容语言）
+ * @returns {Promise<string>} - 优化后的转录文本
+ */
+async function formatTranscriptText(rawTranscript, outputLanguage = 'zh') {
+    try {
+        console.log(`📝 开始智能优化转录文本: ${rawTranscript.length} 字符 (修正错误 + 格式化)`);
+
+        const prompt = outputLanguage === 'zh' ? 
+            `请对以下音频转录文本进行智能优化和格式化，要求：
+
+**内容优化：**
+1. 纠正明显的错别字（如：因该→应该、的地得用法等）
+2. 修正同音字错误（如：在→再、做→作、象→像等）
+3. 修复语句不通顺的地方，让表达更自然流畅
+4. 补充遗漏的标点符号，改正标点使用错误
+5. 保持原意和语气不变，不要删减或添加内容
+
+**格式优化：**
+1. 按照语义和对话逻辑进行合理分段
+2. 在问答转换、话题转换处换行或空行
+3. 保留口语化表达和语气词（嗯、啊、那个等）
+4. 让整体排版清晰易读
+
+**注意：这是对话/访谈内容，请保持对话的原始风格和完整性**
+
+原始转录文本：
+${rawTranscript}` :
+            `Please intelligently optimize and format the following audio transcript text:
+
+**Content Optimization:**
+1. Correct obvious typos and spelling errors
+2. Fix homophones and word confusion errors
+3. Repair grammatically awkward sentences for natural flow
+4. Add missing punctuation and correct punctuation errors
+5. Maintain original meaning and tone, don't remove or add content
+
+**Format Optimization:**
+1. Add reasonable paragraph breaks based on semantic and conversational logic
+2. Add line breaks at question-answer transitions and topic changes
+3. Preserve colloquial expressions and filler words (um, ah, etc.)
+4. Make overall layout clear and readable
+
+**Note: This is dialogue/interview content, please maintain the original conversational style and completeness**
+
+Original transcript text:
+${rawTranscript}`;
+
+        const response = await openai.chat.completions.create({
+            model: 'gpt-3.5-turbo',
+            messages: [
+                {
+                    role: 'system',
+                    content: '你是一个专业的音频转录文本优化助手，负责修正转录错误、改善文本通顺度和排版格式，但必须保持原意不变，不删减或添加内容。'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            max_tokens: 4096,
+            temperature: 0.1
+        });
+
+        const formattedText = response.choices[0].message.content.trim();
+        
+        console.log(`✅ 文本优化完成: ${rawTranscript.length} → ${formattedText.length} 字符`);
+        
+        return formattedText;
+        
+    } catch (error) {
+        console.error('❌ 文本优化失败:', error.message);
+        console.warn('🔄 返回原始文本');
+        return rawTranscript; // 失败时返回原文本
+    }
+}
 
 /**
  * 优化转录文本的连续性和流畅性
@@ -370,6 +574,7 @@ module.exports = {
     transcribeAudio,
     transcribeAudioLocal,
     transcribeMultipleAudios,
+    formatTranscriptText,
     optimizeTranscriptContinuity,
     generateSummary
 };

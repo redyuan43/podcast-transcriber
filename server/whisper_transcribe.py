@@ -110,6 +110,57 @@ class LocalWhisperTranscriber:
         
         return results
 
+def save_transcript_to_file(transcript_text, save_dir, file_prefix=None, original_filename=None):
+    """
+    保存转录文本到文件
+    
+    Args:
+        transcript_text: 转录文本
+        save_dir: 保存目录
+        file_prefix: 文件前缀
+        original_filename: 原始音频文件名
+    
+    Returns:
+        dict: 保存的文件信息
+    """
+    try:
+        save_path = Path(save_dir)
+        save_path.mkdir(parents=True, exist_ok=True)
+        
+        # 生成文件名
+        if file_prefix:
+            filename = f"{file_prefix}_transcript.txt"
+        elif original_filename:
+            audio_name = Path(original_filename).stem
+            timestamp = int(time.time())
+            filename = f"{audio_name}_transcript_{timestamp}.txt"
+        else:
+            timestamp = int(time.time())
+            filename = f"transcript_{timestamp}.txt"
+        
+        file_path = save_path / filename
+        
+        # 保存文件
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(transcript_text)
+        
+        # 获取文件信息
+        file_size = file_path.stat().st_size
+        
+        file_info = {
+            "type": "transcript",
+            "filename": filename,
+            "path": str(file_path),
+            "size": file_size
+        }
+        
+        print(f"📄 转录文本已保存: {file_path} ({file_size/1024:.1f}KB)", file=sys.stderr)
+        return file_info
+        
+    except Exception as e:
+        print(f"❌ 保存转录文件失败: {e}", file=sys.stderr)
+        return None
+
 def main():
     parser = argparse.ArgumentParser(description="本地Faster-Whisper音频转录")
     parser.add_argument("files", nargs="+", help="音频文件路径")
@@ -123,6 +174,8 @@ def main():
                        choices=["int8", "int16", "float16", "float32"],
                        help="计算精度")
     parser.add_argument("--output", help="输出JSON文件路径")
+    parser.add_argument("--save-transcript", help="直接保存转录文本到指定目录")
+    parser.add_argument("--file-prefix", help="保存文件的前缀名称")
     
     args = parser.parse_args()
     
@@ -148,6 +201,22 @@ def main():
             result = transcriber.transcribe_file(audio_files[0], args.language)
         else:
             result = transcriber.transcribe_multiple(audio_files, args.language)
+        
+        # 处理转录文本保存
+        saved_files = []
+        if args.save_transcript and isinstance(result, dict) and result.get('success') and result.get('text'):
+            file_info = save_transcript_to_file(
+                transcript_text=result['text'],
+                save_dir=args.save_transcript,
+                file_prefix=args.file_prefix,
+                original_filename=audio_files[0] if len(audio_files) == 1 else None
+            )
+            if file_info:
+                saved_files.append(file_info)
+        
+        # 在结果中添加保存的文件信息
+        if isinstance(result, dict):
+            result['savedFiles'] = saved_files
         
         # 输出结果
         if args.output:

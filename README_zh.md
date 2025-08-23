@@ -6,7 +6,7 @@
 
 ## 🌟 项目概述
 
-播客提取器是一个全栈Web应用，旨在连接音频内容与文本可访问性之间的桥梁。它能自动处理来自各大平台的播客节目，通过智能分割处理大型音频文件，并以多种语言提供准确的转录和有意义的总结。
+播客提取器是一个将音频内容转化为文本的全栈web应用，自动处理来自各大平台的播客节目，并以多种语言提供准确的转录和有意义的总结。
 
 ### 核心能力
 
@@ -15,7 +15,7 @@
 - **🔗 多平台支持**：支持Apple Podcasts、小宇宙、RSS订阅源和直接音频URL
 - **🎵 智能音频处理**：直接处理大文件，无大小限制
 - **🤖 AI智能优化**：无缝文本连续性优化和结构化总结
-- **🔒 隐私优先**：完全本地处理，无数据上传
+- **🔒 隐私优先**：本地转录处理，最小数据共享（仅文本总结使用外部AI）
 - **🌍 双语界面**：原生中英文支持，动态语言切换
 - **📱 响应式设计**：现代化移动优先UI，基于TailwindCSS构建
 
@@ -80,17 +80,26 @@ podcast-to-text/
 │
 ├── 📂 server/                          # 后端服务
 │   ├── 📄 index.js                     # Express服务器和API路由
-│   └── 📂 services/                    # 核心业务逻辑
-│       ├── 📄 openaiService.js         # AI处理和优化
-│       ├── 📄 podcastService.js        # 播客提取和解析
-│       ├── 📄 audioCompressionService.js # 音频分割和管理
-│       └── 📄 rssParser.js             # RSS订阅源处理
+│   ├── 📄 whisper_transcribe.py        # 本地Faster-Whisper转录脚本
+│   ├── 📂 assets/                      # 测试资源
+│   │   └── 📄 test_audio.mp3           # 测试音频样本
+│   ├── 📂 services/                    # 核心业务逻辑
+│   │   ├── 📄 openaiService.js         # AI处理和优化
+│   │   ├── 📄 podcastService.js        # 播客提取和解析
+│   │   ├── 📄 audioCompressionService.js # 音频处理管理
+│   │   └── 📄 rssParser.js             # RSS订阅源处理
+│   └── 📂 temp/                        # 临时音频和文本存储（自动创建）
 │
 ├── 📄 package.json                     # 依赖和脚本
-├── 📄 .env.example                     # 环境配置模板
+├── 📄 package-lock.json                # 依赖锁定文件
+├── 📄 .env                            # 环境配置（从.env.example创建）
+├── 📄 .gitignore                       # Git忽略规则
 ├── 📄 README.md                        # 英文文档
 ├── 📄 README_zh.md                     # 中文文档
-└── 📂 temp/                           # 临时音频存储（自动创建）
+├── 📄 PLATFORM_SUPPORT.md             # 平台兼容性指南
+├── 📄 start.sh                        # 生产环境启动脚本
+├── 📄 quick-start.sh                   # 快速设置脚本
+└── 📄 fix-cursor-terminal.md           # IDE故障排除指南
 ```
 
 ## 🚀 快速开始

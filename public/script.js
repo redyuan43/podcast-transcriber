@@ -21,6 +21,18 @@ const translations = {
         summaryTitle: "AI总结",
         loadingText: "正在处理您的播客...",
         errorText: "处理过程中出现错误",
+        estimatedTime: "预计需要 10-15 分钟...",
+        processingTips: "处理中，请耐心等待：",
+        tipKeepOpen: "页面请保持打开状态",
+        tipLargeFile: "大文件需要更长时间处理",
+        tipAutoShow: "处理完成后会自动显示结果",
+        stepDownload: "下载音频文件",
+        stepTranscribe: "AI语音转录中...",
+        stepSummarize: "生成智能总结",
+        processingComplete: "处理完成！",
+        remainingTime: "预计还需",
+        minutes: "分钟",
+        almostDone: "即将完成...",
         langFlag: "🇨🇳",
         langText: "中文"
     },
@@ -28,7 +40,7 @@ const translations = {
         title: "Podcast Extractor",
         subtitle: "Just provide a podcast audio link to get high-quality transcription and AI-powered summary",
         urlLabel: "Podcast Audio Link",
-        urlHelper: "Supports Apple Podcasts, Xiaoyuzhou, RSS feeds, and direct audio links",
+        urlHelper: "Supports Apple Podcasts, RSS feeds, Xiaoyuzhou, and direct audio links",
         operationLabel: "Operation Type",
         option1Title: "Transcribe & Summarize",
         option1Desc: "Get transcription and AI summary",
@@ -45,6 +57,18 @@ const translations = {
         summaryTitle: "AI Summary",
         loadingText: "Processing your podcast...",
         errorText: "An error occurred during processing",
+        estimatedTime: "Estimated 10-15 minutes...",
+        processingTips: "Processing, please wait patiently:",
+        tipKeepOpen: "Keep this page open",
+        tipLargeFile: "Large files require more processing time",
+        tipAutoShow: "Results will display automatically when complete",
+        stepDownload: "Download audio file",
+        stepTranscribe: "AI transcription in progress...",
+        stepSummarize: "Generate smart summary",
+        processingComplete: "Processing complete!",
+        remainingTime: "Estimated",
+        minutes: "minutes remaining",
+        almostDone: "Almost done...",
         langFlag: "🇺🇸",
         langText: "English"
     }
@@ -82,7 +106,39 @@ function updateUI() {
     const urlInput = document.getElementById('podcastUrl');
     urlInput.placeholder = currentLang === 'zh' 
         ? 'https://example.com/podcast/episode'
-        : 'https://example.com/podcast/episode';
+        : 'https://example.com/podcast/example';
+    
+    // 更新进度页面的文本元素
+    const progressElements = {
+        'stepDownloadText': 'stepDownload',
+        'stepTranscribeText': 'stepTranscribe', 
+        'stepSummarizeText': 'stepSummarize',
+        'processingTipsText': 'processingTips',
+        'tipLargeFileText': 'tipLargeFile',
+        'tipKeepOpenText': 'tipKeepOpen',
+        'tipAutoShowText': 'tipAutoShow'
+    };
+    
+    Object.keys(progressElements).forEach(elementId => {
+        const element = document.getElementById(elementId);
+        const textKey = progressElements[elementId];
+        if (element && texts[textKey]) {
+            element.textContent = texts[textKey];
+        }
+    });
+    
+    // 如果进度条在显示中，更新预计时间文本
+    const estimatedTime = document.getElementById('estimatedTime');
+    if (estimatedTime && !estimatedTime.textContent.includes('%')) {
+        // 只在不是具体时间时更新（避免覆盖动态时间）
+        if (estimatedTime.textContent.includes('预计需要') || estimatedTime.textContent.includes('Estimated')) {
+            estimatedTime.textContent = texts.estimatedTime;
+        } else if (estimatedTime.textContent.includes('完成') || estimatedTime.textContent.includes('complete')) {
+            estimatedTime.textContent = texts.processingComplete;
+        } else if (estimatedTime.textContent.includes('即将') || estimatedTime.textContent.includes('Almost')) {
+            estimatedTime.textContent = texts.almostDone;
+        }
+    }
 }
 
 // 表单提交处理
@@ -103,23 +159,35 @@ async function processPodcast(event) {
     
     // 显示结果区域和加载状态
     showResults();
-    showLoading();
+    showLoadingWithProgress();
     
     try {
-        // 调用后端API
+        // 调用后端API，设置15分钟超时
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15 * 60 * 1000); // 15分钟超时
+        
+        // 启动进度模拟
+        startProgressSimulation();
+        
         const response = await fetch('/api/process-podcast', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(data)
+            body: JSON.stringify(data),
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
         const result = await response.json();
+        
+        // 停止进度模拟
+        stopProgressSimulation();
         
         if (result.success) {
             showResultsContent(result.data);
@@ -129,7 +197,13 @@ async function processPodcast(event) {
         
     } catch (error) {
         console.error('Error processing podcast:', error);
-        showError(error.message);
+        stopProgressSimulation();
+        
+        if (error.name === 'AbortError') {
+            showError('处理超时，请检查网络连接或稍后重试 / Processing timeout, please check network or retry later');
+        } else {
+            showError(error.message);
+        }
     }
 }
 
@@ -150,6 +224,103 @@ function showLoading() {
     const submitBtn = document.getElementById('submitBtn');
     submitBtn.disabled = true;
     submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+}
+
+// 显示带进度的加载状态
+function showLoadingWithProgress() {
+    showLoading();
+    
+    // 重置进度条
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const estimatedTime = document.getElementById('estimatedTime');
+    
+    if (progressBar) {
+        progressBar.style.width = '0%';
+        progressBar.setAttribute('aria-valuenow', '0');
+    }
+    
+    if (progressText) {
+        progressText.textContent = '0%';
+    }
+    
+    if (estimatedTime) {
+        estimatedTime.textContent = translations[currentLang].estimatedTime;
+    }
+}
+
+// 进度模拟变量
+let progressInterval = null;
+let currentProgress = 0;
+
+// 启动进度模拟
+function startProgressSimulation() {
+    currentProgress = 0;
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const estimatedTime = document.getElementById('estimatedTime');
+    
+    progressInterval = setInterval(() => {
+        // 模拟进度增长：前期快速增长，后期缓慢
+        if (currentProgress < 20) {
+            currentProgress += Math.random() * 3; // 0-20%: 快速
+        } else if (currentProgress < 60) {
+            currentProgress += Math.random() * 1.5; // 20-60%: 中等
+        } else if (currentProgress < 85) {
+            currentProgress += Math.random() * 0.8; // 60-85%: 缓慢
+        } else if (currentProgress < 95) {
+            currentProgress += Math.random() * 0.3; // 85-95%: 很缓慢
+        }
+        
+        // 确保不超过95%（留最后5%给实际完成）
+        currentProgress = Math.min(currentProgress, 95);
+        
+        // 更新UI
+        if (progressBar) {
+            progressBar.style.width = `${currentProgress}%`;
+            progressBar.setAttribute('aria-valuenow', Math.floor(currentProgress));
+        }
+        
+        if (progressText) {
+            progressText.textContent = `${Math.floor(currentProgress)}%`;
+        }
+        
+        // 更新预计时间
+        if (estimatedTime) {
+            const remaining = Math.max(1, Math.floor((100 - currentProgress) * 0.15)); // 假设每1%需要0.15分钟
+            if (remaining > 1) {
+                estimatedTime.textContent = `${translations[currentLang].remainingTime} ${remaining} ${translations[currentLang].minutes}...`;
+            } else {
+                estimatedTime.textContent = translations[currentLang].almostDone;
+            }
+        }
+    }, 1000); // 每秒更新一次
+}
+
+// 停止进度模拟
+function stopProgressSimulation() {
+    if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
+    }
+    
+    // 设置为100%完成
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const estimatedTime = document.getElementById('estimatedTime');
+    
+    if (progressBar) {
+        progressBar.style.width = '100%';
+        progressBar.setAttribute('aria-valuenow', '100');
+    }
+    
+    if (progressText) {
+        progressText.textContent = '100%';
+    }
+    
+    if (estimatedTime) {
+        estimatedTime.textContent = translations[currentLang].processingComplete;
+    }
 }
 
 // 显示结果内容
@@ -271,8 +442,8 @@ function showDownloadButtons(savedFiles) {
         };
         
         const nameMap = {
-            'transcript': currentLanguage === 'zh' ? '转录文本' : 'Transcript',
-            'summary': currentLanguage === 'zh' ? 'AI总结' : 'AI Summary'
+            'transcript': currentLang === 'zh' ? '转录文本' : 'Transcript',
+            'summary': currentLang === 'zh' ? 'AI总结' : 'AI Summary'
         };
         
         const sizeText = formatFileSize(file.size);
