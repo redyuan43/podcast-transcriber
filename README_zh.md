@@ -1,3 +1,5 @@
+<div align="center">
+
 # 🎙️ 播客提取器
 
 **中文 | [English](README.md)**
@@ -5,6 +7,8 @@
 一个专业级的双语播客转录和总结平台，能够将播客音频转换为高质量的文本转录和AI智能总结。
 
 ![播客提取器页面](public/podcast_cn.png)
+
+</div>
 
 ## 🌟 项目概述
 
