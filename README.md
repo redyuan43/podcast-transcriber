@@ -4,7 +4,7 @@
 
 English | [中文](README_zh.md)
 
-An open-source tool that turns podcasts into high-quality transcripts and AI-powered summaries. Turn podcasts into text, instantly.
+An open-source tool that turns podcasts into high-quality transcripts and AI-powered summaries.
 
 ![Podcast Transcriber Interface](public/podcast_en.jpeg)
 
