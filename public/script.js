@@ -139,6 +139,13 @@ function updateUI() {
             estimatedTime.textContent = texts.almostDone;
         }
     }
+    
+    // 如果有下载按钮显示，重新生成以更新语言
+    const downloadSection = document.getElementById('downloadSection');
+    if (downloadSection && !downloadSection.classList.contains('hidden')) {
+        // 获取当前的savedFiles数据并重新生成下载按钮
+        updateDownloadButtonsLanguage();
+    }
 }
 
 // 表单提交处理
@@ -190,7 +197,7 @@ async function processPodcast(event) {
         stopProgressSimulation();
         
         if (result.success) {
-            showResultsContent(result.data);
+            showResultsContent(result.data, data.operation);
         } else {
             showError(result.error || 'Unknown error occurred');
         }
@@ -200,10 +207,100 @@ async function processPodcast(event) {
         stopProgressSimulation();
         
         if (error.name === 'AbortError') {
-            showError('处理超时，请检查网络连接或稍后重试 / Processing timeout, please check network or retry later');
+            // 超时后检查是否有文件已生成
+            console.log('🔄 检测到超时，正在检查处理结果...');
+            await checkForCompletedFiles();
         } else {
             showError(error.message);
         }
+    }
+}
+
+// 检查是否有已完成的文件
+async function checkForCompletedFiles() {
+    try {
+        // 显示检查状态
+        showLoadingWithProgress();
+        updateProgressText('正在检查处理结果... / Checking processing results...', '验证文件完整性 / Verifying file integrity');
+        
+        // 获取temp目录中的文件列表
+        const response = await fetch('/api/temp-files');
+        if (!response.ok) {
+            throw new Error('无法获取文件列表');
+        }
+        
+        const result = await response.json();
+        
+        // 查找最新的转录和总结文件
+        const allFiles = result.files || [];
+        const transcriptFiles = allFiles.filter(f => f.filename.includes('_transcript.md'));
+        const summaryFiles = allFiles.filter(f => f.filename.includes('_summary.md'));
+        
+        if (transcriptFiles.length > 0) {
+            // 找到了转录文件，构造成功响应
+            const latestTranscript = transcriptFiles[transcriptFiles.length - 1];
+            const latestSummary = summaryFiles.find(f => 
+                f.filename.startsWith(latestTranscript.filename.split('_transcript')[0])
+            );
+            
+            // 读取文件内容
+            const transcriptContent = await fetchFileContent(latestTranscript.filename);
+            
+            const mockResult = {
+                transcript: transcriptContent,
+                summary: latestSummary ? await fetchFileContent(latestSummary.filename) : null,
+                language: 'zh',
+                savedFiles: [
+                    {
+                        type: 'transcript',
+                        filename: latestTranscript.filename,
+                        size: latestTranscript.size
+                    }
+                ]
+            };
+            
+            if (latestSummary) {
+                mockResult.savedFiles.push({
+                    type: 'summary', 
+                    filename: latestSummary.filename,
+                    size: latestSummary.size
+                });
+            }
+            
+            stopProgressSimulation();
+            
+            // 显示成功结果
+            const operation = latestSummary ? 'transcribe_summarize' : 'transcribe_only';
+            showResultsContent(mockResult, operation);
+            
+            // 显示成功消息
+            const successMsg = currentLang === 'zh' ? 
+                '✅ 检测到处理已完成！文件已成功生成。' : 
+                '✅ Processing completed! Files generated successfully.';
+            console.log(successMsg);
+            
+        } else {
+            // 没有找到文件，显示真正的超时错误
+            showError('处理超时，请检查网络连接或稍后重试 / Processing timeout, please check network or retry later');
+        }
+        
+    } catch (error) {
+        console.error('检查文件时出错:', error);
+        showError('处理超时，请检查网络连接或稍后重试 / Processing timeout, please check network or retry later');
+    }
+}
+
+// 获取文件内容
+async function fetchFileContent(filename) {
+    try {
+        const response = await fetch(`/api/download/${filename}`);
+        if (!response.ok) {
+            throw new Error(`无法读取文件: ${filename}`);
+        }
+        return await response.text();
+    } catch (error) {
+        console.error(`读取文件 ${filename} 失败:`, error);
+        return '文件内容读取失败';
     }
 }
 
@@ -324,24 +421,47 @@ function stopProgressSimulation() {
 }
 
 // 显示结果内容
-function showResultsContent(data) {
+function showResultsContent(data, operation = 'transcribe_only') {
     document.getElementById('loadingState').classList.add('hidden');
     document.getElementById('errorState').classList.add('hidden');
     document.getElementById('resultsContent').classList.remove('hidden');
     
-    // 显示转录文本
+    // 获取区域元素
+    const transcriptSection = document.getElementById('transcriptSection');
+    const summarySection = document.getElementById('summarySection');
+    
+    // 显示转录文本（Markdown渲染）
     const transcriptText = document.getElementById('transcriptText');
-    transcriptText.textContent = data.transcript || 'No transcript available';
+    const transcript = data.transcript || 'No transcript available';
+    transcriptText.innerHTML = marked.parse(transcript);
     
     // 显示总结（如果有）
-    const summarySection = document.getElementById('summarySection');
     const summaryText = document.getElementById('summaryText');
     
     if (data.summary) {
         summarySection.classList.remove('hidden');
-        summaryText.textContent = data.summary;
+        summaryText.innerHTML = marked.parse(data.summary);
     } else {
         summarySection.classList.add('hidden');
+    }
+    
+    // 根据操作模式调整显示顺序
+    if (operation === 'transcribe_summarize' && data.summary) {
+        // 转录+总结模式：总结在上，转录在下
+        summarySection.style.order = '1';
+        transcriptSection.style.order = '2';
+        const orderMsg = currentLang === 'zh' ? 
+            '📋 显示顺序：AI总结 → 转录文本' : 
+            '📋 Display order: AI Summary → Transcript';
+        console.log(orderMsg);
+    } else {
+        // 仅转录模式：转录在上
+        transcriptSection.style.order = '1';
+        summarySection.style.order = '2';
+        const orderMsg = currentLang === 'zh' ? 
+            '📝 显示顺序：转录文本 → AI总结' : 
+            '📝 Display order: Transcript → AI Summary';
+        console.log(orderMsg);
     }
     
     // 显示下载按钮（如果有保存的文件）
@@ -426,44 +546,77 @@ function showDownloadButtons(savedFiles) {
         return;
     }
     
-    // 清空之前的按钮
+    // 清空之前的链接
     downloadButtons.innerHTML = '';
     
-    // 为每个保存的文件创建下载按钮
+    // 为每个保存的文件创建下载链接
     savedFiles.forEach(file => {
-        const button = document.createElement('a');
-        button.href = `/api/download/${file.filename}`;
-        button.download = file.filename;
-        button.className = 'flex items-center justify-between p-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-xl hover:from-green-600 hover:to-teal-600 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 no-underline';
-        
-        const iconMap = {
-            'transcript': '📝',
-            'summary': '🤖'
-        };
+        const link = document.createElement('a');
+        link.href = `/api/download/${file.filename}`;
+        link.download = file.filename;
+        link.className = 'text-blue-600 hover:text-blue-800 underline hover:no-underline transition-colors font-medium';
         
         const nameMap = {
             'transcript': currentLang === 'zh' ? '转录文本' : 'Transcript',
             'summary': currentLang === 'zh' ? 'AI总结' : 'AI Summary'
         };
         
+        const downloadText = currentLang === 'zh' ? '下载' : 'Download';
+        const fileName = nameMap[file.type] || file.type;
         const sizeText = formatFileSize(file.size);
         
-        button.innerHTML = `
-            <div class="flex items-center">
-                <span class="text-2xl mr-3">${iconMap[file.type] || '📄'}</span>
-                <div>
-                    <div class="font-semibold">${nameMap[file.type] || file.type}</div>
-                    <div class="text-sm opacity-90">${sizeText}</div>
-                </div>
-            </div>
-            <span class="text-xl">⬇️</span>
-        `;
+        link.textContent = `${downloadText} ${fileName} (${sizeText})`;
         
-        downloadButtons.appendChild(button);
+        downloadButtons.appendChild(link);
     });
     
     // 显示下载区域
     downloadSection.classList.remove('hidden');
+}
+
+// 更新下载按钮的语言
+function updateDownloadButtonsLanguage() {
+    const downloadButtons = document.getElementById('downloadButtons');
+    if (!downloadButtons) return;
+    
+    // 从现有链接中提取文件信息
+    const links = downloadButtons.querySelectorAll('a[download]');
+    const savedFiles = [];
+    
+    links.forEach(link => {
+        const filename = link.getAttribute('download');
+        const linkText = link.textContent;
+        
+        // 根据文件名判断类型
+        let type = 'unknown';
+        if (filename.includes('_transcript.')) {
+            type = 'transcript';
+        } else if (filename.includes('_summary.')) {
+            type = 'summary';
+        }
+        
+        // 从链接文本中提取文件大小（提取括号中的内容）
+        let size = 0;
+        const sizeMatch = linkText.match(/\((\d+\.?\d*)\s*(KB|MB|GB)\)/);
+        if (sizeMatch) {
+            const value = parseFloat(sizeMatch[1]);
+            const unit = sizeMatch[2];
+            if (unit === 'KB') size = value * 1024;
+            else if (unit === 'MB') size = value * 1024 * 1024;
+            else if (unit === 'GB') size = value * 1024 * 1024 * 1024;
+        }
+        
+        savedFiles.push({
+            filename: filename,
+            type: type,
+            size: size
+        });
+    });
+    
+    // 重新生成下载链接
+    if (savedFiles.length > 0) {
+        showDownloadButtons(savedFiles);
+    }
 }
 
 // 格式化文件大小
@@ -473,4 +626,96 @@ function formatFileSize(bytes) {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// 语言切换功能
+function toggleLanguage() {
+    currentLang = currentLang === 'zh' ? 'en' : 'zh';
+    updateUI();
+    updateLanguageToggle();
+}
+
+// 更新语言切换按钮
+function updateLanguageToggle() {
+    const toggle = document.getElementById('languageToggle');
+    const texts = translations[currentLang];
+    if (toggle && texts) {
+        toggle.innerHTML = `<span class="mr-2">${texts.langFlag}</span>${texts.langText}`;
+    }
+}
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    updateUI();
+    updateLanguageToggle();
+    
+    // 页面加载时检查是否有已完成的文件
+    checkForCompletedFilesOnLoad();
+});
+
+// 页面加载时检查已完成的文件
+async function checkForCompletedFilesOnLoad() {
+    try {
+        console.log('🔄 检查是否有已完成的处理结果...');
+        
+        const response = await fetch('/api/temp-files');
+        if (!response.ok) {
+            return; // 静默失败，不影响页面正常使用
+        }
+        
+        const result = await response.json();
+        const allFiles = result.files || [];
+        
+        // 查找最新的转录和总结文件
+        const transcriptFiles = allFiles.filter(f => f.filename.includes('_transcript.md'));
+        const summaryFiles = allFiles.filter(f => f.filename.includes('_summary.md'));
+        
+        if (transcriptFiles.length > 0) {
+            // 找到转录文件，获取最新的一组
+            const latestTranscript = transcriptFiles[0]; // 文件已按修改时间排序
+            const latestSummary = summaryFiles.find(f => 
+                f.filename.startsWith(latestTranscript.filename.split('_transcript')[0])
+            );
+            
+            console.log('✅ 发现已完成的处理结果');
+            
+            // 读取文件内容并显示
+            const transcriptContent = await fetchFileContent(latestTranscript.filename);
+            
+            const mockResult = {
+                transcript: transcriptContent,
+                summary: latestSummary ? await fetchFileContent(latestSummary.filename) : null,
+                language: 'zh',
+                savedFiles: [
+                    {
+                        type: 'transcript',
+                        filename: latestTranscript.filename,
+                        size: latestTranscript.size
+                    }
+                ]
+            };
+            
+            if (latestSummary) {
+                mockResult.savedFiles.push({
+                    type: 'summary', 
+                    filename: latestSummary.filename,
+                    size: latestSummary.size
+                });
+            }
+            
+            // 显示结果
+            const operation = latestSummary ? 'transcribe_summarize' : 'transcribe_only';
+            showResultsContent(mockResult, operation);
+            
+            // 显示提示消息
+            const successMsg = currentLang === 'zh' ? 
+                '💡 页面已自动加载最近的处理结果' : 
+                '💡 Latest processing results loaded automatically';
+            console.log(successMsg);
+        }
+        
+    } catch (error) {
+        console.log('🔍 没有发现已完成的处理结果');
+        // 静默失败，不影响页面正常使用
+    }
 }

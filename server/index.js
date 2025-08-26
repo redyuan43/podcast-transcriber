@@ -76,7 +76,7 @@ app.post('/api/process-podcast', async (req, res) => {
         console.log('🔍 检查音频文件大小并智能处理...');
         const audioFiles = await smartCompress(originalAudioPath);
         
-        const shouldSummarize = operation === 'transcribe_and_summarize';
+        const shouldSummarize = operation === 'transcribe_summarize';
         console.log(`📋 处理模式: ${shouldSummarize ? '转录+总结' : '仅转录'}`);
         
         // 步骤3: 使用本地Whisper处理音频
@@ -203,7 +203,14 @@ app.post('/api/process-local-file', async (req, res) => {
 app.get('/api/temp-files', (req, res) => {
     try {
         const files = fs.readdirSync(tempDir)
-            .filter(file => file.endsWith('.m4a') || file.endsWith('.mp3') || file.endsWith('.wav'))
+            .filter(file => 
+                // 音频文件
+                file.endsWith('.m4a') || file.endsWith('.mp3') || file.endsWith('.wav') ||
+                // 转录和总结文件
+                file.endsWith('_transcript.md') || file.endsWith('_summary.md') ||
+                // 其他文本文件
+                file.endsWith('.txt') || file.endsWith('.md')
+            )
             .map(file => {
                 const filePath = path.join(tempDir, file);
                 const stats = fs.statSync(filePath);

@@ -95,7 +95,12 @@ async function extractApplePodcastAudio(url) {
         const itunesApiUrl = `https://itunes.apple.com/lookup?id=${podcastId}&entity=podcast`;
         console.log(`查询iTunes API: ${itunesApiUrl}`);
         
-        const itunesResponse = await axios.get(itunesApiUrl, { timeout: 10000 });
+        const itunesResponse = await axios.get(itunesApiUrl, { 
+            timeout: 10000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+        });
         
         if (!itunesResponse.data?.results?.length) {
             throw new Error('iTunes API未返回有效结果');
@@ -144,7 +149,99 @@ async function extractApplePodcastAudio(url) {
 
     } catch (error) {
         console.error('Apple Podcasts解析失败:', error);
+        
+        // 如果是网络连接问题，尝试从网页抓取
+        if (error.code === 'EADDRNOTAVAIL' || error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+            console.log('🔄 iTunes API无法访问，尝试网页抓取方案...');
+            try {
+                return await extractFromApplePodcastsPage(url);
+            } catch (pageError) {
+                console.error('网页抓取也失败:', pageError);
+                
+                // 提供通用的网络问题解决方案
+                if (pageError.message.includes('Apple Podcasts解析失败')) {
+                    throw pageError; // 使用备用方案的详细错误信息
+                } else {
+                    throw new Error(`网络连接问题 (${error.code}): 无法访问Apple/iTunes服务。建议使用RSS链接或直接音频文件URL。`);
+                }
+            }
+        }
+        
         throw new Error(`Apple Podcasts音频解析失败: ${error.message}`);
+    }
+}
+
+/**
+ * 从Apple Podcasts网页抓取音频链接 (备用方案)
+ */
+async function extractFromApplePodcastsPage(url) {
+    console.log('📄 尝试从Apple Podcasts网页抓取音频链接...');
+    
+    try {
+        // 直接抓取网页内容
+        const response = await axios.get(url, {
+            timeout: 15000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            }
+        });
+        
+        const html = response.data;
+        
+        // 尝试从网页中提取音频链接
+        // 方案1: 查找JSON-LD数据
+        const jsonLdMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>(.*?)<\/script>/s);
+        if (jsonLdMatch) {
+            try {
+                const jsonLd = JSON.parse(jsonLdMatch[1]);
+                if (jsonLd.url && jsonLd.url.includes('.mp3')) {
+                    console.log('✅ 从JSON-LD中找到音频链接');
+                    return jsonLd.url;
+                }
+            } catch (e) {
+                console.log('JSON-LD解析失败，继续尝试其他方案');
+            }
+        }
+        
+        // 方案2: 查找Acast音频链接
+        const acastMatch = html.match(/https?:\/\/[^"'\s]*acast[^"'\s]*\.mp3[^"'\s]*/i);
+        if (acastMatch) {
+            console.log('✅ 从HTML中找到Acast音频链接');
+            return acastMatch[0];
+        }
+        
+        // 方案3: 查找其他直接音频链接  
+        const audioLinkMatch = html.match(/https?:\/\/[^"'\s]+\.(mp3|m4a|wav)[^"'\s]*/);
+        if (audioLinkMatch) {
+            console.log('✅ 从HTML中找到音频链接');
+            return audioLinkMatch[0];
+        }
+        
+        // 方案4: 查找play按钮的data属性或href
+        const playButtonMatch = html.match(/data-url=["']([^"']*\.(mp3|m4a))["']/i) || 
+                               html.match(/href=["']([^"']*\.(mp3|m4a))["']/i);
+        if (playButtonMatch) {
+            console.log('✅ 从播放按钮中找到音频链接');
+            return playButtonMatch[1];
+        }
+        
+        // 方案3: 提示用户手动获取RSS
+        const podcastIdMatch = url.match(/id(\d+)/);
+        const podcastId = podcastIdMatch ? podcastIdMatch[1] : null;
+        
+        throw new Error(`Apple Podcasts网络访问受限。解决方案：1) 使用RSS订阅链接 2) 使用直接音频文件URL (.mp3/.m4a) 3) 尝试小宇宙等其他播客平台。播客ID: ${podcastId}`);
+        
+    } catch (error) {
+        if (error.message.includes('建议')) {
+            throw error;
+        }
+        throw new Error(`网页抓取失败: ${error.message}`);
     }
 }
 

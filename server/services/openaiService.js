@@ -6,6 +6,41 @@ const { promisify } = require('util');
 
 const execAsync = promisify(exec);
 
+/**
+ * 将总结格式化为Markdown
+ */
+function formatSummaryAsMarkdown(summary, audioFilePath) {
+    const audioName = audioFilePath ? path.basename(audioFilePath, path.extname(audioFilePath)) : '未知';
+    const currentTime = new Date().toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit', 
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    
+    return `# 🤖 AI总结
+
+## 📊 基本信息
+
+- **文件名称**: ${audioName}
+- **生成时间**: ${currentTime}
+- **总结引擎**: OpenAI GPT-4
+- **总结长度**: ${summary.length} 字符
+
+---
+
+## 📋 内容总结
+
+${summary}
+
+---
+
+*本文档由 [Podcast提取器](https://github.com/your-repo/podcast-to-text) 自动生成*
+`;
+}
+
 // 本地Whisper转录配置
 const WHISPER_MODEL = process.env.WHISPER_MODEL || 'base'; // Whisper模型大小
 console.log(`🎤 转录模式: 本地Faster-Whisper`);
@@ -14,8 +49,8 @@ console.log(`🎤 转录模式: 本地Faster-Whisper`);
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
     baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
-    timeout: 300000, // 5分钟超时（音频转录需要更长时间）
-    maxRetries: 0  // 禁用自动重试，我们手动处理
+    timeout: 900000,
+    maxRetries: 0
 });
 
 /**
@@ -50,8 +85,9 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
             console.log(`⚙️ 执行命令: ${command}`);
             
             const { stdout, stderr } = await execAsync(command, {
-                maxBuffer: 1024 * 1024 * 10,
-                timeout: 600000
+                cwd: path.join(__dirname, '..'),
+                maxBuffer: 1024 * 1024 * 20,
+                timeout: 1200000
             });
             
             if (stderr && stderr.trim()) {
@@ -71,30 +107,50 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
             console.log(`💾 Python脚本保存了 ${savedFiles.length} 个文件`);
 
             // 对转录文本进行智能优化（错别字修正+格式化）
-            console.log(`📝 开始智能优化转录文本...`);
-            const optimizedTranscript = await formatTranscriptText(transcript, outputLanguage);
+            let optimizedTranscript = transcript; // 默认使用原始文本
+            let optimizationSuccess = false;
             
-            // 保存优化后的文本（覆盖原文件）
-            if (savedFiles.length > 0) {
-                const transcriptFile = savedFiles.find(f => f.type === 'transcript');
-                if (transcriptFile && fs.existsSync(transcriptFile.path)) {
-                    fs.writeFileSync(transcriptFile.path, optimizedTranscript, 'utf8');
-                    console.log(`📄 优化文本已保存: ${transcriptFile.filename}`);
+            for (let retryCount = 0; retryCount < 3; retryCount++) {
+                try {
+                    console.log(`📝 开始智能优化转录文本${retryCount > 0 ? ` (重试 ${retryCount}/3)` : ''}...`);
+                    optimizedTranscript = await formatTranscriptText(transcript, outputLanguage);
+                    optimizationSuccess = true;
+                    break;
+                } catch (optimizationError) {
+                    console.error(`❌ 文本优化失败 (尝试 ${retryCount + 1}/3): ${optimizationError.message}`);
+                    if (retryCount < 2) {
+                        console.log(`⏳ 等待 ${(retryCount + 1) * 3} 秒后重试...`);
+                        await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 3000));
+                    }
                 }
             }
             
-            // 更新结果
-            transcript = optimizedTranscript;
+            if (optimizationSuccess) {
+                // 保存优化后的文本（覆盖原文件）
+                if (savedFiles.length > 0) {
+                    const transcriptFile = savedFiles.find(f => f.type === 'transcript');
+                    if (transcriptFile && fs.existsSync(transcriptFile.path)) {
+                        fs.writeFileSync(transcriptFile.path, optimizedTranscript, 'utf8');
+                        console.log(`📄 优化文本已保存: ${transcriptFile.filename}`);
+                    }
+                }
+                // 更新结果
+                transcript = optimizedTranscript;
+            } else {
+                console.warn(`🔄 AI优化失败，保留原始转录文本`);
+                // 保持原始transcript不变，确保转录结果不丢失
+            }
             
             // 如果需要总结，使用优化后的转录文本进行AI总结
             if (shouldSummarize) {
                 console.log(`📝 开始生成总结...`);
                 const summary = await generateSummary(transcript, outputLanguage);
                 
-                // 保存AI总结
-                const summaryFileName = `${filePrefix}_summary.txt`;
+                // 保存AI总结（Markdown格式）
+                const summaryFileName = `${filePrefix}_summary.md`;
                 const summaryPath = path.join(tempDir, summaryFileName);
-                fs.writeFileSync(summaryPath, summary, 'utf8');
+                const markdownSummary = formatSummaryAsMarkdown(summary, files[0]);
+                fs.writeFileSync(summaryPath, markdownSummary, 'utf8');
                 
                 savedFiles.push({
                     type: 'summary',
@@ -310,8 +366,9 @@ async function transcribeAudioLocal(audioPath, language = null, shouldSaveDirect
         
         // 执行转录脚本
         const { stdout, stderr } = await execAsync(command, {
-            maxBuffer: 1024 * 1024 * 10, // 10MB缓冲区
-            timeout: 600000 // 10分钟超时
+            cwd: path.join(__dirname, '..'),
+            maxBuffer: 1024 * 1024 * 20,
+            timeout: 1200000
         });
         
         if (stderr && stderr.trim()) {
@@ -379,15 +436,24 @@ async function formatTranscriptText(rawTranscript, outputLanguage = 'zh') {
     try {
         console.log(`📝 开始智能优化转录文本: ${rawTranscript.length} 字符 (修正错误 + 格式化)`);
 
+        // 检查文本长度，超过限制时分块处理
+        const maxCharsPerChunk = 8000; // 约14000 tokens，留出余量
+        
+        if (rawTranscript.length > maxCharsPerChunk) {
+            console.log(`📄 文本过长 (${rawTranscript.length} 字符)，使用分块处理`);
+            return await formatLongTranscriptInChunks(rawTranscript, outputLanguage, maxCharsPerChunk);
+        }
+
         const prompt = outputLanguage === 'zh' ? 
             `请对以下音频转录文本进行智能优化和格式化，要求：
 
 **内容优化：**
 1. 纠正明显的错别字（如：因该→应该、的地得用法等）
 2. 修正同音字错误（如：在→再、做→作、象→像等）
-3. 修复语句不通顺的地方，让表达更自然流畅
-4. 补充遗漏的标点符号，改正标点使用错误
-5. 保持原意和语气不变，不要删减或添加内容
+3. 智能识别并修正品牌名称的音译错误（仔细分析文本中的品牌名称，判断是否为知名公司的错误音译）
+4. 修复语句不通顺的地方，让表达更自然流畅
+5. 补充遗漏的标点符号，改正标点使用错误
+6. 保持原意和语气不变，不要删减或添加内容
 
 **格式优化：**
 1. 按照语义和对话逻辑进行合理分段
@@ -404,9 +470,10 @@ ${rawTranscript}` :
 **Content Optimization:**
 1. Correct obvious typos and spelling errors
 2. Fix homophones and word confusion errors
-3. Repair grammatically awkward sentences for natural flow
-4. Add missing punctuation and correct punctuation errors
-5. Maintain original meaning and tone, don't remove or add content
+3. Intelligently identify and correct brand name transcription errors (carefully analyze brand names in text and determine if they are mistranscribed famous companies)
+4. Repair grammatically awkward sentences for natural flow
+5. Add missing punctuation and correct punctuation errors
+6. Maintain original meaning and tone, don't remove or add content
 
 **Format Optimization:**
 1. Add reasonable paragraph breaks based on semantic and conversational logic
@@ -523,6 +590,14 @@ async function generateSummary(transcript, outputLanguage = 'zh') {
     try {
         console.log(`📋 生成总结 (${outputLanguage})...`);
         
+        // 检查文本长度，超过限制时分块处理
+        const maxCharsForSummary = 6000; // 约10000 tokens，为总结留更多空间
+        
+        if (transcript.length > maxCharsForSummary) {
+            console.log(`📄 文本过长 (${transcript.length} 字符)，使用分块总结`);
+            return await generateSummaryInChunks(transcript, outputLanguage, maxCharsForSummary);
+        }
+        
         const systemPrompt = outputLanguage === 'zh'
             ? `你是一个专业的内容总结助手。请为以下音频转录内容生成一个全面、结构化的总结：
 
@@ -569,12 +644,253 @@ Please generate a structured summary with key points and essential content.`;
     }
 }
 
+/**
+ * 分块处理超长文本的总结生成
+ */
+async function generateSummaryInChunks(transcript, outputLanguage, maxCharsPerChunk) {
+    try {
+        // 使用相同的分块逻辑
+        let chunks = [];
+        
+        // 尝试按标点符号分块
+        const sentences = transcript.split(/[。！？\n]+/).filter(s => s.trim());
+        let currentChunk = '';
+        
+        for (const sentence of sentences) {
+            const testChunk = currentChunk + (currentChunk ? '。' : '') + sentence;
+            if (testChunk.length > maxCharsPerChunk && currentChunk) {
+                chunks.push(currentChunk.trim());
+                currentChunk = sentence;
+            } else {
+                currentChunk = testChunk;
+            }
+        }
+        
+        if (currentChunk.trim()) {
+            chunks.push(currentChunk.trim());
+        }
+        
+        // 强制分割大块
+        const finalChunks = [];
+        for (const chunk of chunks) {
+            if (chunk.length <= maxCharsPerChunk) {
+                finalChunks.push(chunk);
+            } else {
+                for (let i = 0; i < chunk.length; i += maxCharsPerChunk) {
+                    finalChunks.push(chunk.substring(i, i + maxCharsPerChunk));
+                }
+            }
+        }
+        
+        chunks = finalChunks;
+        console.log(`📊 文本分为 ${chunks.length} 块进行总结`);
+        
+        // 为每个分块生成总结
+        const chunkSummaries = [];
+        for (let i = 0; i < chunks.length; i++) {
+            console.log(`🔄 总结第 ${i + 1}/${chunks.length} 块 (${chunks[i].length} 字符)`);
+            
+            try {
+                const chunkSummary = await generateSummary(chunks[i], outputLanguage);
+                chunkSummaries.push(chunkSummary);
+                
+                // 添加延迟避免API限制
+                if (i < chunks.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            } catch (chunkError) {
+                console.warn(`⚠️ 第 ${i + 1} 块总结失败: ${chunkError.message}`);
+                chunkSummaries.push(`[第${i + 1}块总结失败]`);
+            }
+        }
+        
+        // 合并所有分块总结
+        const combinedSummary = chunkSummaries.join('\n\n');
+        
+        // 对合并的总结进行最终整理
+        const finalSystemPrompt = outputLanguage === 'zh'
+            ? `请将以下分段总结整理成一个连贯、完整的总结，去除重复内容，保持逻辑清晰：`
+            : `Please organize the following segmented summaries into a coherent, complete summary, removing duplicate content and maintaining clear logic:`;
+        
+        try {
+            const finalResponse = await openai.chat.completions.create({
+                model: "gpt-4",
+                messages: [
+                    { role: "system", content: finalSystemPrompt },
+                    { role: "user", content: combinedSummary }
+                ],
+                temperature: 0.3,
+                max_tokens: 2000
+            });
+            
+            const finalSummary = finalResponse.choices[0].message.content.trim();
+            console.log(`✅ 分块总结完成: ${transcript.length} → ${finalSummary.length} 字符`);
+            
+            return finalSummary;
+        } catch (finalError) {
+            console.warn(`⚠️ 最终总结整理失败，返回合并总结: ${finalError.message}`);
+            return combinedSummary;
+        }
+        
+    } catch (error) {
+        console.error('❌ 分块总结失败:', error.message);
+        throw error;
+    }
+}
+
+/**
+ * 格式化单个文本块（不进行分块检查，避免递归）
+ */
+async function formatSingleChunk(chunkText, outputLanguage = 'zh') {
+    try {
+        const prompt = outputLanguage === 'zh' ? 
+            `请对以下音频转录文本进行智能优化和格式化，要求：
+
+**内容优化：**
+1. 纠正明显的错别字（如：因该→应该、的地得用法等）
+2. 修正同音字错误（如：在→再、做→作、象→像等）
+3. 智能识别并修正品牌名称的音译错误（仔细分析文本中的品牌名称，判断是否为知名公司的错误音译）
+4. 修复语句不通顺的地方，让表达更自然流畅
+5. 补充遗漏的标点符号，改正标点使用错误
+6. 保持原意和语气不变，不要删减或添加内容
+
+**格式优化：**
+1. 按照语义和对话逻辑进行合理分段
+2. 在问答转换、话题转换处换行或空行
+3. 保留口语化表达和语气词（嗯、啊、那个等）
+4. 让整体排版清晰易读
+
+**注意：这是对话/访谈内容，请保持对话的原始风格和完整性**
+
+原始转录文本：
+${chunkText}` :
+            `Please intelligently optimize and format the following audio transcript text:
+
+**Content Optimization:**
+1. Correct obvious typos and spelling errors
+2. Fix homophones and word confusion errors
+3. Intelligently identify and correct brand name transcription errors (carefully analyze brand names in text and determine if they are mistranscribed famous companies)
+4. Repair grammatically awkward sentences for natural flow
+5. Add missing punctuation and correct punctuation errors
+6. Maintain original meaning and tone, don't remove or add content
+
+**Format Optimization:**
+1. **Must break into reasonable paragraphs based on semantic logic - don't leave as one giant paragraph**
+2. Add line breaks at topic transitions and logical shifts
+3. Each paragraph should not exceed 3-4 sentences for readability
+4. Preserve colloquial expressions and filler words (um, ah, etc.)
+5. Ensure overall layout is clear and readable with proper paragraph spacing
+4. Make overall layout clear and readable
+
+**Note: This is dialogue/interview content, please maintain the original conversational style and completeness**
+
+Original transcript text:
+${chunkText}`;
+
+        const response = await openai.chat.completions.create({
+            model: 'gpt-3.5-turbo',
+            messages: [
+                {
+                    role: 'system',
+                    content: '你是一个专业的音频转录文本优化助手，负责修正转录错误、改善文本通顺度和排版格式，但必须保持原意不变，不删减或添加内容。'
+                },
+                {
+                    role: 'user',
+                    content: prompt
+                }
+            ],
+            max_tokens: 4096,
+            temperature: 0.1
+        });
+
+        return response.choices[0].message.content.trim();
+        
+    } catch (error) {
+        console.error('❌ 单块文本优化失败:', error.message);
+        return chunkText; // 失败时返回原文本
+    }
+}
+
+/**
+ * 分块处理超长转录文本
+ */
+async function formatLongTranscriptInChunks(rawTranscript, outputLanguage, maxCharsPerChunk) {
+    try {
+        // 智能分块：优先按标点符号，其次按空格，最后强制分割
+        let chunks = [];
+        
+        // 尝试按标点符号分块
+        const sentences = rawTranscript.split(/[。！？\n]+/).filter(s => s.trim());
+        let currentChunk = '';
+        
+        for (const sentence of sentences) {
+            const testChunk = currentChunk + (currentChunk ? '。' : '') + sentence;
+            if (testChunk.length > maxCharsPerChunk && currentChunk) {
+                chunks.push(currentChunk.trim());
+                currentChunk = sentence;
+            } else {
+                currentChunk = testChunk;
+            }
+        }
+        
+        if (currentChunk.trim()) {
+            chunks.push(currentChunk.trim());
+        }
+        
+        // 如果分块仍然太大，强制按字符数分割
+        const finalChunks = [];
+        for (const chunk of chunks) {
+            if (chunk.length <= maxCharsPerChunk) {
+                finalChunks.push(chunk);
+            } else {
+                // 强制分割大块
+                for (let i = 0; i < chunk.length; i += maxCharsPerChunk) {
+                    finalChunks.push(chunk.substring(i, i + maxCharsPerChunk));
+                }
+            }
+        }
+        
+        chunks = finalChunks;
+        
+        console.log(`📊 文本分为 ${chunks.length} 块处理`);
+        
+        const optimizedChunks = [];
+        for (let i = 0; i < chunks.length; i++) {
+            console.log(`🔄 处理第 ${i + 1}/${chunks.length} 块 (${chunks[i].length} 字符)`);
+            
+            try {
+                // 直接调用OpenAI，避免递归循环
+                const optimizedChunk = await formatSingleChunk(chunks[i], outputLanguage);
+                optimizedChunks.push(optimizedChunk);
+                
+                // 添加延迟避免API限制
+                if (i < chunks.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            } catch (chunkError) {
+                console.warn(`⚠️ 第 ${i + 1} 块优化失败，使用原始文本: ${chunkError.message}`);
+                optimizedChunks.push(chunks[i]);
+            }
+        }
+        
+        const result = optimizedChunks.join('\n\n');
+        console.log(`✅ 分块优化完成: ${rawTranscript.length} → ${result.length} 字符`);
+        
+        return result;
+        
+    } catch (error) {
+        console.error('❌ 分块优化失败:', error.message);
+        return rawTranscript;
+    }
+}
+
 module.exports = {
     processAudioWithOpenAI,
     transcribeAudio,
     transcribeAudioLocal,
     transcribeMultipleAudios,
     formatTranscriptText,
+    formatSummaryAsMarkdown,
     optimizeTranscriptContinuity,
     generateSummary
 };

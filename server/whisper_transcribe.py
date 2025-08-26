@@ -110,6 +110,50 @@ class LocalWhisperTranscriber:
         
         return results
 
+def format_transcript_as_markdown(transcript_text, original_filename=None):
+    """
+    将转录文本格式化为Markdown
+    
+    Args:
+        transcript_text: 原始转录文本
+        original_filename: 原始音频文件名
+    
+    Returns:
+        str: 格式化的Markdown内容
+    """
+    from datetime import datetime
+    
+    # 获取当前时间
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # 获取音频文件信息
+    audio_name = "未知"
+    if original_filename:
+        audio_name = Path(original_filename).stem
+    
+    # 构建Markdown内容
+    markdown_content = f"""# 🎙️ Podcast转录
+
+## 📊 基本信息
+
+- **文件名称**: {audio_name}
+- **转录时间**: {current_time}
+- **转录引擎**: Faster-Whisper (local)
+- **文本长度**: {len(transcript_text)} 字符
+
+---
+
+## 📝 转录内容
+
+{transcript_text}
+
+---
+
+*本文档由 [Podcast提取器](https://github.com/your-repo/podcast-to-text) 自动生成*
+"""
+    
+    return markdown_content
+
 def save_transcript_to_file(transcript_text, save_dir, file_prefix=None, original_filename=None):
     """
     保存转录文本到文件
@@ -129,20 +173,23 @@ def save_transcript_to_file(transcript_text, save_dir, file_prefix=None, origina
         
         # 生成文件名
         if file_prefix:
-            filename = f"{file_prefix}_transcript.txt"
+            filename = f"{file_prefix}_transcript.md"
         elif original_filename:
             audio_name = Path(original_filename).stem
             timestamp = int(time.time())
-            filename = f"{audio_name}_transcript_{timestamp}.txt"
+            filename = f"{audio_name}_transcript_{timestamp}.md"
         else:
             timestamp = int(time.time())
-            filename = f"transcript_{timestamp}.txt"
+            filename = f"transcript_{timestamp}.md"
         
         file_path = save_path / filename
         
+        # 格式化为Markdown
+        markdown_content = format_transcript_as_markdown(transcript_text, original_filename)
+        
         # 保存文件
         with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(transcript_text)
+            f.write(markdown_content)
         
         # 获取文件信息
         file_size = file_path.stat().st_size

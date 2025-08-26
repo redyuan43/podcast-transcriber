@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🎙️ Podcast提取器 / Podcast Extractor</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.2/marked.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -241,37 +242,33 @@
                 </div>
 
                 <!-- Results Content -->
-                <div id="resultsContent" class="hidden">
+                <div id="resultsContent" class="hidden flex flex-col">
                     <!-- Transcript Section -->
-                    <div class="mb-8">
+                    <div id="transcriptSection" class="mb-8">
                         <h3 class="text-xl font-semibold text-slate-800 mb-4 flex items-center">
                             <span class="text-xl mr-2">📝</span>
                             <span id="transcriptTitle">转录文本</span>
                         </h3>
                         <div class="bg-slate-50 rounded-xl p-6 border border-slate-200">
-                            <pre id="transcriptText" class="whitespace-pre-wrap text-sm text-slate-700 leading-relaxed font-mono"></pre>
+                            <div id="transcriptText" class="prose prose-slate max-w-none text-sm leading-relaxed"></div>
                         </div>
                     </div>
 
                     <!-- Summary Section -->
-                    <div id="summarySection" class="hidden">
+                    <div id="summarySection" class="hidden mb-8">
                         <h3 class="text-xl font-semibold text-slate-800 mb-4 flex items-center">
                             <span class="text-xl mr-2">🤖</span>
                             <span id="summaryTitle">AI总结</span>
                         </h3>
                         <div class="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-6 border border-blue-200">
-                            <div id="summaryText" class="text-slate-700 leading-relaxed"></div>
+                            <div id="summaryText" class="prose prose-slate max-w-none text-slate-700 leading-relaxed"></div>
                         </div>
                     </div>
 
                     <!-- Download Section -->
-                    <div id="downloadSection" class="hidden mt-8">
-                        <h3 class="text-xl font-semibold text-slate-800 mb-4 flex items-center">
-                            <span class="text-xl mr-2">💾</span>
-                            <span id="downloadTitle">文件下载</span>
-                        </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="downloadButtons">
-                            <!-- Download buttons will be added here by JavaScript -->
+                    <div id="downloadSection" class="hidden mt-2 mb-8">
+                        <div class="flex flex-wrap gap-6 justify-center" id="downloadButtons">
+                            <!-- Download links will be added here by JavaScript -->
                         </div>
                     </div>
                 </div>
