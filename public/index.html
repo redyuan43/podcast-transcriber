@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -54,6 +54,38 @@
         /* 进度条平滑过渡 */
         #progressBar {
             transition: width 0.5s ease-out;
+        }
+        
+        /* 移除prose中的分割线和边框，保持段落间距 */
+        .prose hr {
+            display: none !important;
+        }
+        .prose * {
+            border: none !important;
+            border-top: none !important;
+            border-bottom: none !important;
+        }
+        .prose p {
+            margin-bottom: 1rem !important;
+        }
+        .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+            margin-top: 1.5rem !important;
+            margin-bottom: 0.75rem !important;
+            border: none !important;
+        }
+        .prose ul, .prose ol {
+            margin-bottom: 1rem !important;
+        }
+        .prose li {
+            margin-bottom: 0.5rem !important;
+        }
+        .prose blockquote {
+            margin-top: 1rem !important;
+            margin-bottom: 1rem !important;
+            border-left: 4px solid #e2e8f0 !important;
+            border-top: none !important;
+            border-bottom: none !important;
+            border-right: none !important;
         }
     </style>
 </head>
@@ -140,6 +172,12 @@
                             <option value="auto" id="autoDetect">自动检测</option>
                             <option value="zh">中文</option>
                             <option value="en">English</option>
+                            <option value="es">Español</option>
+                            <option value="fr">Français</option>
+                            <option value="de">Deutsch</option>
+                            <option value="it">Italiano</option>
+                            <option value="pt">Português</option>
+                            <option value="ru">Русский</option>
                             <option value="ja">日本語</option>
                             <option value="ko">한국어</option>
                         </select>
@@ -153,6 +191,9 @@
                         <select id="outputLanguage" class="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-slate-700">
                             <option value="zh" id="chineseOption">中文</option>
                             <option value="en" id="englishOption">English</option>
+                            <option value="es" id="spanishOption">Español</option>
+                            <option value="fr" id="frenchOption">Français</option>
+                            <option value="de" id="germanOption">Deutsch</option>
                         </select>
                     </div>
                 </div>
@@ -171,7 +212,7 @@
         <!-- Results Section -->
         <div id="resultsSection" class="hidden">
             <div class="glass rounded-2xl shadow-xl border border-white/20 p-8">
-                <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center">
+                <h2 class="text-2xl font-bold text-slate-800 mb-4 flex items-center">
                     <span class="text-2xl mr-3">📄</span>
                     <span id="resultsTitle">处理结果</span>
                 </h2>
@@ -244,24 +285,24 @@
                 <!-- Results Content -->
                 <div id="resultsContent" class="hidden flex flex-col">
                     <!-- Transcript Section -->
-                    <div id="transcriptSection" class="mb-8">
-                        <h3 class="text-xl font-semibold text-slate-800 mb-4 flex items-center">
+                    <div id="transcriptSection" class="mb-6">
+                        <h3 class="text-xl font-semibold text-slate-800 mb-3 flex items-center">
                             <span class="text-xl mr-2">📝</span>
                             <span id="transcriptTitle">转录文本</span>
                         </h3>
                         <div class="bg-slate-50 rounded-xl p-6 border border-slate-200">
-                            <div id="transcriptText" class="prose prose-slate max-w-none text-sm leading-relaxed"></div>
+                            <div id="transcriptText" class="prose prose-slate max-w-none text-base leading-relaxed whitespace-pre-line"></div>
                         </div>
                     </div>
 
                     <!-- Summary Section -->
-                    <div id="summarySection" class="hidden mb-8">
-                        <h3 class="text-xl font-semibold text-slate-800 mb-4 flex items-center">
+                    <div id="summarySection" class="hidden mb-6">
+                        <h3 class="text-xl font-semibold text-slate-800 mb-3 flex items-center">
                             <span class="text-xl mr-2">🤖</span>
                             <span id="summaryTitle">AI总结</span>
                         </h3>
                         <div class="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-6 border border-blue-200">
-                            <div id="summaryText" class="prose prose-slate max-w-none text-slate-700 leading-relaxed"></div>
+                            <div id="summaryText" class="prose prose-slate max-w-none text-base leading-relaxed whitespace-pre-line"></div>
                         </div>
                     </div>
 

@@ -60,7 +60,7 @@ const openai = new OpenAI({
  * @param {string} outputLanguage - 输出语言
  * @returns {Promise<Object>} - 处理结果
  */
-async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outputLanguage = 'zh', tempDir = null) {
+async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outputLanguage = 'zh', tempDir = null, audioLanguage = 'auto') {
     try {
         console.log(`🤖 开始音频处理 - OpenAI`);
         
@@ -113,7 +113,9 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
             for (let retryCount = 0; retryCount < 3; retryCount++) {
                 try {
                     console.log(`📝 开始智能优化转录文本${retryCount > 0 ? ` (重试 ${retryCount}/3)` : ''}...`);
-                    optimizedTranscript = await formatTranscriptText(transcript, outputLanguage);
+                    // 检测转录文本的实际语言，用于优化提示词
+                    const detectedLanguage = detectTranscriptLanguage(transcript, audioLanguage);
+                    optimizedTranscript = await formatTranscriptText(transcript, detectedLanguage);
                     optimizationSuccess = true;
                     break;
                 } catch (optimizationError) {
@@ -126,12 +128,28 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
             }
             
             if (optimizationSuccess) {
-                // 保存优化后的文本（覆盖原文件）
+                // 保存原始转录备份和优化后的文本
                 if (savedFiles.length > 0) {
                     const transcriptFile = savedFiles.find(f => f.type === 'transcript');
                     if (transcriptFile && fs.existsSync(transcriptFile.path)) {
+                        // 备份原始转录文件
+                        const originalBackupPath = transcriptFile.path.replace('.md', '_original.md');
+                        if (!fs.existsSync(originalBackupPath)) {
+                            fs.copyFileSync(transcriptFile.path, originalBackupPath);
+                            console.log(`💾 原始转录已备份: ${path.basename(originalBackupPath)}`);
+                        }
+                        
+                        // 保存优化后的文本
                         fs.writeFileSync(transcriptFile.path, optimizedTranscript, 'utf8');
                         console.log(`📄 优化文本已保存: ${transcriptFile.filename}`);
+                        
+                        // 添加备份文件到结果中
+                        savedFiles.push({
+                            type: 'original_transcript',
+                            filename: path.basename(originalBackupPath),
+                            path: originalBackupPath,
+                            size: fs.statSync(originalBackupPath).size
+                        });
                     }
                 }
                 // 更新结果
@@ -429,59 +447,75 @@ async function transcribeAudio(audioPath, autoDetect = true) {
 /**
  * 优化转录文本：修正错误、改善通顺度和智能分段
  * @param {string} rawTranscript - 原始转录文本
- * @param {string} outputLanguage - 输出语言（仅影响提示语言，不改变内容语言）
- * @returns {Promise<string>} - 优化后的转录文本
+ * @param {string} transcriptLanguage - 转录文本的实际语言（用于选择优化提示词语言，不改变内容语言）
+ * @returns {Promise<string>} - 优化后的转录文本（保持原始语言）
  */
-async function formatTranscriptText(rawTranscript, outputLanguage = 'zh') {
+async function formatTranscriptText(rawTranscript, transcriptLanguage = 'zh') {
     try {
         console.log(`📝 开始智能优化转录文本: ${rawTranscript.length} 字符 (修正错误 + 格式化)`);
 
         // 检查文本长度，超过限制时分块处理
-        const maxCharsPerChunk = 8000; // 约14000 tokens，留出余量
+        const maxCharsPerChunk = 4000; // 约2000-4000 tokens，适合GPT-3.5/GPT-4
         
         if (rawTranscript.length > maxCharsPerChunk) {
             console.log(`📄 文本过长 (${rawTranscript.length} 字符)，使用分块处理`);
-            return await formatLongTranscriptInChunks(rawTranscript, outputLanguage, maxCharsPerChunk);
+            return await formatLongTranscriptInChunks(rawTranscript, transcriptLanguage, maxCharsPerChunk);
         }
 
-        const prompt = outputLanguage === 'zh' ? 
+        const prompt = transcriptLanguage === 'zh' ? 
             `请对以下音频转录文本进行智能优化和格式化，要求：
 
-**内容优化：**
-1. 纠正明显的错别字（如：因该→应该、的地得用法等）
-2. 修正同音字错误（如：在→再、做→作、象→像等）
-3. 智能识别并修正品牌名称的音译错误（仔细分析文本中的品牌名称，判断是否为知名公司的错误音译）
-4. 修复语句不通顺的地方，让表达更自然流畅
-5. 补充遗漏的标点符号，改正标点使用错误
-6. 保持原意和语气不变，不要删减或添加内容
+**内容优化（正确性与可读性优先）：**
+1. **修复所有明显错误** - 包括转录错误、断句错误、不完整词句等
+2. 纠正错别字和拼写错误，修正同音字混淆
+3. 智能识别并修正品牌名称、专有名词的音译错误
+4. **适度改善语法和表达** - 在保持原意的前提下，让表达更清晰流畅
+5. **保留重要的口语特征** - 保持语气词（嗯、啊、那个等），但可以删除过多的重复
+6. **补全不完整表达** - 根据上下文补全明显缺失的词语，提高可读性
+7. **严格保持原始语言** - 不要翻译，保持原意和主要观点不变
+8. 添加适当的标点符号，提升阅读体验
 
-**格式优化：**
-1. 按照语义和对话逻辑进行合理分段
-2. 在问答转换、话题转换处换行或空行
-3. 保留口语化表达和语气词（嗯、啊、那个等）
-4. 让整体排版清晰易读
+**格式优化（播客对话分段优先）：**
+1. **智能识别播客对话结构并按对话逻辑分段**：
+   - **问答边界分段** - 当主持人提出问题和嘉宾开始回答时分段
+   - **发言人转换分段** - 当发言人从一个人转换到另一个人时分段
+   - **话题转换分段** - 当讨论主题发生明显转换时分段
+   - **完整思路分段** - 当一个完整的观点或论述表达完毕时分段
+2. **保持对话的自然流程** - 每个段落应该是一个相对完整的对话单元
+3. 每个段落之间必须有一个空行分隔（两个换行符）
+4. **适度保留口语特征** - 保持自然的语气词和对话特色，但删除影响阅读的过度重复
+5. 确保输出的是标准markdown格式，段落间有空行
+6. 让播客对话具有良好的阅读流畅性和对话感
 
-**注意：这是对话/访谈内容，请保持对话的原始风格和完整性**
+**核心原则：生成清晰、易读、准确的播客转录文本，在保持原意的前提下优化对话表达质量。**
 
 原始转录文本：
 ${rawTranscript}` :
             `Please intelligently optimize and format the following audio transcript text:
 
-**Content Optimization:**
-1. Correct obvious typos and spelling errors
-2. Fix homophones and word confusion errors
-3. Intelligently identify and correct brand name transcription errors (carefully analyze brand names in text and determine if they are mistranscribed famous companies)
-4. Repair grammatically awkward sentences for natural flow
-5. Add missing punctuation and correct punctuation errors
-6. Maintain original meaning and tone, don't remove or add content
+**Content Optimization (Accuracy & Readability First):**
+1. **Fix all obvious errors** - Including transcription errors, fragment errors, incomplete words/sentences
+2. Correct typos and spelling errors, fix homophone confusions
+3. Intelligently identify and correct brand names and proper noun transcription errors
+4. **Moderately improve grammar and expression** - Make expressions clearer and more fluent while preserving original meaning
+5. **Preserve important speaking characteristics** - Keep natural filler words (um, ah, like, you know, etc.) but remove excessive repetitions
+6. **Complete incomplete expressions** - Use context to complete obviously missing words for better readability
+7. **Strictly maintain original language** - No translation, preserve original meaning and main points
+8. Add appropriate punctuation to enhance reading experience
 
-**Format Optimization:**
-1. Add reasonable paragraph breaks based on semantic and conversational logic
-2. Add line breaks at question-answer transitions and topic changes
-3. Preserve colloquial expressions and filler words (um, ah, etc.)
-4. Make overall layout clear and readable
+**Format Optimization (Podcast Dialogue Segmentation Priority):**
+1. **Intelligently recognize podcast dialogue structure and segment by conversational logic**:
+   - **Question-Answer boundary segmentation** - Create breaks when hosts ask questions and guests begin answering
+   - **Speaker transition segmentation** - Create breaks when speakers change from one person to another
+   - **Topic transition segmentation** - Create breaks when discussion topics clearly shift
+   - **Complete thought segmentation** - Create breaks when a complete viewpoint or argument is fully expressed
+2. **Maintain natural conversation flow** - Each paragraph should be a relatively complete conversational unit
+3. Each paragraph must be separated by a blank line (double line breaks)
+4. **Moderately preserve speaking characteristics** - Keep natural filler words and conversational style but remove excessive repetitions that hinder reading
+5. Ensure output is in standard markdown format with blank lines between paragraphs
+6. Make podcast dialogue have good reading fluency and conversational feel
 
-**Note: This is dialogue/interview content, please maintain the original conversational style and completeness**
+**Core Principle: Generate clear, readable, and accurate podcast transcript text that optimizes dialogue expression quality while preserving original meaning.**
 
 Original transcript text:
 ${rawTranscript}`;
@@ -502,8 +536,15 @@ ${rawTranscript}`;
             temperature: 0.1
         });
 
-        const formattedText = response.choices[0].message.content.trim();
+        const optimizedText = response.choices[0].message.content.trim();
         
+        // 调试: 检查优化后的分段情况
+        console.log('🔍 OpenAI优化后文本前500字符:', JSON.stringify(optimizedText.substring(0, 500)));
+        console.log('🔍 OpenAI优化后换行符数量:', (optimizedText.match(/\n/g) || []).length);
+        
+        const formattedText = ensureMarkdownParagraphs(optimizedText);
+        
+        console.log('🔍 ensureMarkdownParagraphs后文本前500字符:', JSON.stringify(formattedText.substring(0, 500)));
         console.log(`✅ 文本优化完成: ${rawTranscript.length} → ${formattedText.length} 字符`);
         
         return formattedText;
@@ -590,16 +631,30 @@ async function generateSummary(transcript, outputLanguage = 'zh') {
     try {
         console.log(`📋 生成总结 (${outputLanguage})...`);
         
-        // 检查文本长度，超过限制时分块处理
-        const maxCharsForSummary = 6000; // 约10000 tokens，为总结留更多空间
+        // 智能处理不同长度的文本
+        // 考虑token限制：GPT-4约8000 tokens，中文1-2字符=1token，安全起见用6000字符
+        const maxCharsForDirectSummary = 6000; // 约3000-6000 tokens，适合GPT-4
         
-        if (transcript.length > maxCharsForSummary) {
-            console.log(`📄 文本过长 (${transcript.length} 字符)，使用分块总结`);
-            return await generateSummaryInChunks(transcript, outputLanguage, maxCharsForSummary);
+        if (transcript.length <= maxCharsForDirectSummary) {
+            // 对于适中长度的文本，直接生成总结
+            return await generateDirectSummary(transcript, outputLanguage);
+        } else {
+            // 对于超长文本，使用智能分块策略
+            console.log(`📄 文本过长 (${transcript.length} 字符)，使用智能分块总结策略`);
+            return await generateSmartChunkedSummary(transcript, outputLanguage);
         }
-        
-        const systemPrompt = outputLanguage === 'zh'
-            ? `你是一个专业的播客内容分析师。请为以下播客节目生成一个全面、结构化的总结：
+    } catch (error) {
+        console.error('❌ 总结生成失败:', error);
+        throw new Error(`总结生成失败: ${error.message}`);
+    }
+}
+
+/**
+ * 根据语言获取系统提示词
+ */
+function getSystemPromptByLanguage(outputLanguage) {
+    const prompts = {
+        zh: `你是一个专业的播客内容分析师。请为以下播客节目生成一个全面、结构化的总结：
 
 总结要求：
 1. 提取播客的主要话题和核心观点
@@ -608,10 +663,31 @@ async function generateSummary(transcript, outputLanguage = 'zh') {
 4. 使用简洁明了的语言
 5. 适当保留嘉宾/主持人的表达风格和重要观点
 
+**重要：严格排除以下无价值内容（这是核心要求）：**
+- 播客制作信息（制作团队、编辑、混音师、制作公司等）
+- **赞助商广告和商业推广内容**（任何公司、产品、服务的宣传，包括但不限于保险公司、移动服务商、投资平台、SaaS服务等）
+- **节目资助方信息**（如"本节目由...赞助"、"感谢...的支持"等）
+- 播客标准开头结尾语（如"欢迎收听"、"感谢收听"等）
+- 技术制作细节和播客平台信息
+- 主持人介绍播客本身的元信息
+- **任何形式的商业广告内容**，即使被包装成节目内容的一部分
 
-请生成结构化的播客内容总结，包含要点和关键内容。`
+**重要提醒：如果某段内容主要是在推广产品或服务，即使与主题相关，也应完全排除。只保留纯粹的知识性、信息性、观点性内容。**
 
-            : `You are a professional podcast content analyst. Please generate a comprehensive, structured summary for the following podcast episode:
+段落组织要求（核心）：
+1. **按语意和逻辑主题分段** - 每当话题转换、讨论重点改变、或从一个观点转向另一个观点时，必须开始新段落
+2. **每个段落专注一个主要观点或主题**
+3. **段落之间必须有空行分隔（双换行符\n\n）** 
+4. **思考内容的逻辑流程，合理划分段落边界**
+
+格式要求：
+1. 使用markdown格式，可以包含标题、列表等元素
+2. 确保段落间有空行，便于阅读
+3. 每个段落应该是完整的逻辑单元
+
+请仔细分析内容的语意结构，按逻辑主题合理分段。**必须使用中文输出。**`,
+
+        en: `You are a professional podcast content analyst. Please generate a comprehensive, structured summary for the following podcast episode:
 
 Summary requirements:
 1. Extract main topics and core viewpoints from the podcast
@@ -620,7 +696,90 @@ Summary requirements:
 4. Use concise and clear language
 5. Appropriately retain the hosts'/guests' expression style and important viewpoints
 
-Please generate a structured podcast content summary with key points and essential content.`;
+**Important: Strictly exclude the following non-valuable content (this is a core requirement):**
+- Podcast production information (production team, editors, sound engineers, production companies, etc.)
+- **Sponsor advertisements and commercial promotional content** (any company, product, or service promotion, including but not limited to insurance companies, mobile service providers, investment platforms, SaaS services, etc.)
+- **Program sponsorship information** (such as "this show is sponsored by...", "thanks to... for their support", etc.)
+- Standard podcast opening/closing statements (like "welcome to", "thanks for listening", etc.)
+- Technical production details and podcast platform information
+- Host introductions about the podcast itself (meta-information)
+- **Any form of commercial advertising content**, even if packaged as part of the program content
+
+**Important reminder: If a segment is primarily promoting a product or service, even if related to the topic, it should be completely excluded. Only retain purely knowledge-based, informational, and opinion-based content.**
+
+Paragraph Organization Requirements (Core):
+1. **Organize by semantic and logical themes** - Start a new paragraph whenever the topic shifts, discussion focus changes, or when moving from one viewpoint to another
+2. **Each paragraph should focus on one main viewpoint or theme**
+3. **Paragraphs must be separated by blank lines (double line breaks \n\n)**
+4. **Think about the logical flow of content and reasonably divide paragraph boundaries**
+
+Format requirements:
+1. Use markdown format, may include headings, lists, and other elements
+2. Ensure blank lines between paragraphs for readability
+3. Each paragraph should be a complete logical unit
+
+Please carefully analyze the semantic structure of the content and organize paragraphs logically by themes. **Must output in English.**`,
+
+        es: `Eres un analista profesional de contenido de podcasts. Por favor, genera un resumen integral y estructurado para el siguiente episodio de podcast:
+
+Requisitos del resumen:
+1. Extraer los temas principales y puntos de vista centrales del podcast
+2. Mantener una estructura lógica clara destacando el valor central del podcast
+3. Incluir discusiones importantes, puntos de vista y conclusiones
+4. Usar un lenguaje conciso y claro
+5. Retener apropiadamente el estilo de expresión y puntos de vista importantes de los anfitriones/invitados
+
+Requisitos de formato (Importante):
+1. Debe organizar el contenido por temas o segmentos lógicos
+2. Cada párrafo debe estar separado por una línea en blanco (doble salto de línea)
+3. Asegurar que la salida esté en formato markdown estándar con líneas en blanco entre párrafos
+4. Puede usar encabezados, listas y otros elementos markdown para mejorar la estructura
+
+Por favor, genera un resumen estructurado del contenido del podcast con puntos clave y contenido esencial. La salida debe seguir los requisitos de formato markdown. **Debe generar la salida en español.**`,
+
+        fr: `Vous êtes un analyste professionnel de contenu de podcasts. Veuillez générer un résumé complet et structuré pour l'épisode de podcast suivant :
+
+Exigences du résumé :
+1. Extraire les sujets principaux et les points de vue centraux du podcast
+2. Maintenir une structure logique claire mettant en évidence la valeur centrale du podcast
+3. Inclure les discussions importantes, les points de vue et les conclusions
+4. Utiliser un langage concis et clair
+5. Conserver de manière appropriée le style d'expression et les points de vue importants des hôtes/invités
+
+Exigences de format (Important) :
+1. Doit organiser le contenu par thèmes ou segments logiques
+2. Chaque paragraphe doit être séparé par une ligne vide (double saut de ligne)
+3. S'assurer que la sortie soit en format markdown standard avec des lignes vides entre les paragraphes
+4. Peut utiliser des titres, listes et autres éléments markdown pour améliorer la structure
+
+Veuillez générer un résumé structuré du contenu du podcast avec les points clés et le contenu essentiel. La sortie doit suivre les exigences de format markdown. **Doit générer la sortie en français.**`,
+
+        de: `Sie sind ein professioneller Podcast-Content-Analyst. Bitte erstellen Sie eine umfassende, strukturierte Zusammenfassung für die folgende Podcast-Episode:
+
+Zusammenfassungsanforderungen:
+1. Hauptthemen und zentrale Standpunkte des Podcasts extrahieren
+2. Klare logische Struktur beibehalten, die den zentralen Wert des Podcasts hervorhebt
+3. Wichtige Diskussionen, Standpunkte und Schlussfolgerungen einbeziehen
+4. Präzise und klare Sprache verwenden
+5. Ausdrucksstil und wichtige Standpunkte der Moderatoren/Gäste angemessen bewahren
+
+Formatanforderungen (Wichtig):
+1. Muss Inhalte nach Themen oder logischen Segmenten organisieren
+2. Jeder Absatz muss durch eine Leerzeile getrennt sein (doppelter Zeilenumbruch)
+3. Sicherstellen, dass die Ausgabe im Standard-Markdown-Format mit Leerzeilen zwischen Absätzen ist
+4. Kann Überschriften, Listen und andere Markdown-Elemente zur Strukturverbesserung verwenden
+
+Bitte erstellen Sie eine strukturierte Zusammenfassung des Podcast-Inhalts mit Schlüsselpunkten und wesentlichen Inhalten. Die Ausgabe muss den Markdown-Formatanforderungen entsprechen. **Muss die Ausgabe auf Deutsch generieren.**`
+    };
+
+    return prompts[outputLanguage] || prompts.en;
+}
+
+/**
+ * 直接生成总结（适用于中等长度文本）
+ */
+async function generateDirectSummary(transcript, outputLanguage) {
+    const systemPrompt = getSystemPromptByLanguage(outputLanguage);
 
         const response = await openai.chat.completions.create({
             model: "gpt-4",
@@ -629,68 +788,35 @@ Please generate a structured podcast content summary with key points and essenti
                 { role: "user", content: transcript }
             ],
             temperature: 0.5,
-            max_tokens: Math.min(2000, Math.floor(transcript.length * 0.4))
+        max_tokens: Math.min(3000, Math.floor(transcript.length * 0.4))
         });
 
         const summary = response.choices[0].message.content.trim();
-        console.log(`📄 总结生成完成: ${summary.length} 字符`);
-        
-        return summary;
-
-    } catch (error) {
-        console.error('❌ 总结生成失败:', error);
-        throw new Error(`总结生成失败: ${error.message}`);
-    }
+    const formattedSummary = ensureMarkdownParagraphs(summary);
+    console.log(`📄 总结生成完成: ${formattedSummary.length} 字符`);
+    
+    return formattedSummary;
 }
 
 /**
- * 分块处理超长文本的总结生成
+ * 智能分块总结（适用于超长文本）
  */
-async function generateSummaryInChunks(transcript, outputLanguage, maxCharsPerChunk) {
+async function generateSmartChunkedSummary(transcript, outputLanguage) {
     try {
-        // 使用相同的分块逻辑
-        let chunks = [];
+        const maxCharsPerChunk = 4000; // 每块最大字符数，约2000-4000 tokens
         
-        // 尝试按标点符号分块
-        const sentences = transcript.split(/[。！？\n]+/).filter(s => s.trim());
-        let currentChunk = '';
-        
-        for (const sentence of sentences) {
-            const testChunk = currentChunk + (currentChunk ? '。' : '') + sentence;
-            if (testChunk.length > maxCharsPerChunk && currentChunk) {
-                chunks.push(currentChunk.trim());
-                currentChunk = sentence;
-            } else {
-                currentChunk = testChunk;
-            }
-        }
-        
-        if (currentChunk.trim()) {
-            chunks.push(currentChunk.trim());
-        }
-        
-        // 强制分割大块
-        const finalChunks = [];
-        for (const chunk of chunks) {
-            if (chunk.length <= maxCharsPerChunk) {
-                finalChunks.push(chunk);
-            } else {
-                for (let i = 0; i < chunk.length; i += maxCharsPerChunk) {
-                    finalChunks.push(chunk.substring(i, i + maxCharsPerChunk));
-                }
-            }
-        }
-        
-        chunks = finalChunks;
+        // 智能分块：按段落和句子边界分割
+        const chunks = smartChunkText(transcript, maxCharsPerChunk);
         console.log(`📊 文本分为 ${chunks.length} 块进行总结`);
         
-        // 为每个分块生成总结
+        // 为每个分块生成简要总结
         const chunkSummaries = [];
         for (let i = 0; i < chunks.length; i++) {
             console.log(`🔄 总结第 ${i + 1}/${chunks.length} 块 (${chunks[i].length} 字符)`);
             
             try {
-                const chunkSummary = await generateSummary(chunks[i], outputLanguage);
+                // 直接调用OpenAI生成分块总结，避免递归
+                const chunkSummary = await generateChunkSummary(chunks[i], outputLanguage);
                 chunkSummaries.push(chunkSummary);
                 
                 // 添加延迟避免API限制
@@ -704,84 +830,306 @@ async function generateSummaryInChunks(transcript, outputLanguage, maxCharsPerCh
         }
         
         // 合并所有分块总结
-        const combinedSummary = chunkSummaries.join('\n\n');
+        const combinedSummary = chunkSummaries.join('\n\n---\n\n');
         
-        // 对合并的总结进行最终整理
-        const finalSystemPrompt = outputLanguage === 'zh'
-            ? `请将以下分段总结整理成一个连贯、完整的总结，去除重复内容，保持逻辑清晰：`
-            : `Please organize the following segmented summaries into a coherent, complete summary, removing duplicate content and maintaining clear logic:`;
+        // 最终整合成完整总结
+        const finalSummary = await generateFinalSummary(combinedSummary, outputLanguage);
+        console.log(`✅ 智能分块总结完成: ${transcript.length} → ${finalSummary.length} 字符`);
         
-        try {
-            const finalResponse = await openai.chat.completions.create({
-                model: "gpt-4",
-                messages: [
-                    { role: "system", content: finalSystemPrompt },
-                    { role: "user", content: combinedSummary }
-                ],
-                temperature: 0.3,
-                max_tokens: 2000
-            });
-            
-            const finalSummary = finalResponse.choices[0].message.content.trim();
-            console.log(`✅ 分块总结完成: ${transcript.length} → ${finalSummary.length} 字符`);
-            
-            return finalSummary;
-        } catch (finalError) {
-            console.warn(`⚠️ 最终总结整理失败，返回合并总结: ${finalError.message}`);
-            return combinedSummary;
-        }
-        
+        return finalSummary;
+
     } catch (error) {
-        console.error('❌ 分块总结失败:', error.message);
+        console.error('❌ 智能分块总结失败:', error.message);
         throw error;
     }
 }
 
 /**
+ * 智能文本分块函数
+ */
+function smartChunkText(text, maxCharsPerChunk) {
+    const chunks = [];
+    
+    // 首先按段落分割
+    const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim());
+        let currentChunk = '';
+        
+    for (const paragraph of paragraphs) {
+        const testChunk = currentChunk + (currentChunk ? '\n\n' : '') + paragraph;
+        
+            if (testChunk.length > maxCharsPerChunk && currentChunk) {
+            // 当前块已满，保存并开始新块
+                chunks.push(currentChunk.trim());
+            currentChunk = paragraph;
+            } else {
+                currentChunk = testChunk;
+            }
+        }
+        
+    // 添加最后一块
+        if (currentChunk.trim()) {
+            chunks.push(currentChunk.trim());
+        }
+        
+    // 如果某些块仍然太大，进一步按句子分割
+        const finalChunks = [];
+        for (const chunk of chunks) {
+            if (chunk.length <= maxCharsPerChunk) {
+                finalChunks.push(chunk);
+            } else {
+            // 按句子分割
+            const sentences = chunk.split(/[。！？.!?]+/).filter(s => s.trim());
+            let sentenceChunk = '';
+            
+            for (const sentence of sentences) {
+                const testSentenceChunk = sentenceChunk + (sentenceChunk ? '。' : '') + sentence;
+                if (testSentenceChunk.length > maxCharsPerChunk && sentenceChunk) {
+                    finalChunks.push(sentenceChunk.trim());
+                    sentenceChunk = sentence;
+                } else {
+                    sentenceChunk = testSentenceChunk;
+                }
+            }
+            
+            if (sentenceChunk.trim()) {
+                finalChunks.push(sentenceChunk.trim());
+            }
+        }
+    }
+    
+    return finalChunks;
+}
+
+/**
+ * 获取分块总结的系统提示词
+ */
+function getChunkSummaryPrompt(outputLanguage) {
+    const prompts = {
+        zh: `请为这段播客内容生成简要总结，要求：
+1. 提取主要观点和关键信息
+2. 保持简洁但不遗漏重要内容
+3. 使用中文输出
+4. 保持逻辑清晰
+5. **严格排除广告、赞助商内容、制作信息、播客元信息等无价值内容**
+
+这是播客的一部分内容，请生成这部分的要点总结：`,
+        en: `Please generate a brief summary for this podcast segment, requirements:
+1. Extract main viewpoints and key information
+2. Keep concise but don't miss important content
+3. Output in English
+4. Maintain clear logic
+5. **Strictly exclude advertisements, sponsor content, production information, podcast meta-information and other non-valuable content**
+
+This is part of a podcast, please generate key points summary for this segment:`,
+        es: `Por favor, genera un resumen breve para este segmento del podcast, requisitos:
+1. Extraer los puntos de vista principales e información clave
+2. Mantener conciso pero no perder contenido importante
+3. Generar salida en español
+4. Mantener lógica clara
+
+Esta es parte de un podcast, por favor genera un resumen de puntos clave para este segmento:`,
+        fr: `Veuillez générer un résumé bref pour ce segment de podcast, exigences :
+1. Extraire les points de vue principaux et informations clés
+2. Rester concis mais ne pas manquer de contenu important
+3. Générer la sortie en français
+4. Maintenir une logique claire
+
+Ceci est une partie d'un podcast, veuillez générer un résumé des points clés pour ce segment :`,
+        de: `Bitte erstellen Sie eine kurze Zusammenfassung für dieses Podcast-Segment, Anforderungen:
+1. Hauptstandpunkte und Schlüsselinformationen extrahieren
+2. Prägnant bleiben, aber keine wichtigen Inhalte verpassen
+3. Ausgabe auf Deutsch generieren
+4. Klare Logik beibehalten
+
+Dies ist ein Teil eines Podcasts, bitte erstellen Sie eine Zusammenfassung der Schlüsselpunkte für dieses Segment:`
+    };
+    
+    return prompts[outputLanguage] || prompts.en;
+}
+
+/**
+ * 生成单个分块的总结
+ */
+async function generateChunkSummary(chunkText, outputLanguage) {
+    const systemPrompt = getChunkSummaryPrompt(outputLanguage);
+
+    const response = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: chunkText }
+        ],
+        temperature: 0.3,
+        max_tokens: 800
+    });
+
+    const chunkSummary = response.choices[0].message.content.trim();
+    return ensureMarkdownParagraphs(chunkSummary);
+}
+
+/**
+ * 获取最终整合总结的系统提示词
+ */
+function getFinalSummaryPrompt(outputLanguage) {
+    const prompts = {
+        zh: `请将以下分段总结整合成一个完整、连贯的播客总结：
+
+要求：
+1. 去除重复内容，保持逻辑清晰
+2. 按主题或时间顺序重新组织内容
+3. 每个段落之间必须有一个空行分隔（两个换行符）
+4. 确保输出的是标准markdown格式，段落间有空行
+5. 使用简洁明了的中文
+6. **必须使用中文输出**
+7. 形成一个完整的播客内容总结
+8. **必须严格排除广告、赞助商内容、制作信息、播客元信息等所有无价值内容**
+
+请整理为结构化的播客总结：`,
+        en: `Please integrate the following segmented summaries into a complete, coherent podcast summary:
+
+Requirements:
+1. Remove duplicate content and maintain clear logic
+2. Reorganize content by themes or chronological order
+3. Each paragraph must be separated by a blank line (double line breaks)
+4. Ensure output is in standard markdown format with blank lines between paragraphs
+5. Use concise and clear English
+6. **Must output in English**
+7. Form a complete podcast content summary
+8. **Must strictly exclude advertisements, sponsor content, production information, podcast meta-information and all other non-valuable content**
+
+Please organize into a structured podcast summary:`,
+        es: `Por favor, integra los siguientes resúmenes segmentados en un resumen completo y coherente del podcast:
+
+Requisitos:
+1. Eliminar contenido duplicado y mantener lógica clara
+2. Reorganizar contenido por temas u orden cronológico
+3. Cada párrafo debe estar separado por una línea en blanco (doble salto de línea)
+4. Asegurar que la salida esté en formato markdown estándar con líneas en blanco entre párrafos
+5. Usar español conciso y claro
+6. **Debe generar la salida en español**
+7. Formar un resumen completo del contenido del podcast
+
+Por favor, organiza en un resumen estructurado del podcast:`,
+        fr: `Veuillez intégrer les résumés segmentés suivants en un résumé complet et cohérent du podcast :
+
+Exigences :
+1. Supprimer le contenu dupliqué et maintenir une logique claire
+2. Réorganiser le contenu par thèmes ou ordre chronologique
+3. Chaque paragraphe doit être séparé par une ligne vide (double saut de ligne)
+4. S'assurer que la sortie soit en format markdown standard avec des lignes vides entre les paragraphes
+5. Utiliser un français concis et clair
+6. **Doit générer la sortie en français**
+7. Former un résumé complet du contenu du podcast
+
+Veuillez organiser en un résumé structuré du podcast :`,
+        de: `Bitte integrieren Sie die folgenden segmentierten Zusammenfassungen in eine vollständige, kohärente Podcast-Zusammenfassung:
+
+Anforderungen:
+1. Doppelte Inhalte entfernen und klare Logik beibehalten
+2. Inhalte nach Themen oder chronologischer Reihenfolge neu organisieren
+3. Jeder Absatz muss durch eine Leerzeile getrennt sein (doppelter Zeilenumbruch)
+4. Sicherstellen, dass die Ausgabe im Standard-Markdown-Format mit Leerzeilen zwischen Absätzen ist
+5. Prägnantes und klares Deutsch verwenden
+6. **Muss die Ausgabe auf Deutsch generieren**
+7. Eine vollständige Podcast-Inhaltszusammenfassung bilden
+
+Bitte organisieren Sie als strukturierte Podcast-Zusammenfassung:`
+    };
+    
+    return prompts[outputLanguage] || prompts.en;
+}
+
+/**
+ * 生成最终整合总结
+ */
+async function generateFinalSummary(combinedSummary, outputLanguage) {
+    const systemPrompt = getFinalSummaryPrompt(outputLanguage);
+
+    const response = await openai.chat.completions.create({
+                model: "gpt-4",
+                messages: [
+            { role: "system", content: systemPrompt },
+                    { role: "user", content: combinedSummary }
+                ],
+                temperature: 0.3,
+        max_tokens: 2500
+    });
+
+    const finalSummary = response.choices[0].message.content.trim();
+    return ensureMarkdownParagraphs(finalSummary);
+}
+
+/**
  * 格式化单个文本块（不进行分块检查，避免递归）
  */
-async function formatSingleChunk(chunkText, outputLanguage = 'zh') {
+async function formatSingleChunk(chunkText, transcriptLanguage = 'zh') {
     try {
-        const prompt = outputLanguage === 'zh' ? 
+        const prompt = transcriptLanguage === 'zh' ? 
             `请对以下音频转录文本进行智能优化和格式化，要求：
 
-**内容优化：**
-1. 纠正明显的错别字（如：因该→应该、的地得用法等）
-2. 修正同音字错误（如：在→再、做→作、象→像等）
-3. 智能识别并修正品牌名称的音译错误（仔细分析文本中的品牌名称，判断是否为知名公司的错误音译）
-4. 修复语句不通顺的地方，让表达更自然流畅
-5. 补充遗漏的标点符号，改正标点使用错误
-6. 保持原意和语气不变，不要删减或添加内容
+**内容优化（正确性与可读性优先）：**
+1. **修复所有明显错误** - 包括转录错误、断句错误、不完整词句等
+2. 纠正错别字和拼写错误，修正同音字混淆
+3. 智能识别并修正品牌名称、专有名词的音译错误
+4. **适度改善语法和表达** - 在保持原意的前提下，让表达更清晰流畅
+5. **保留重要的口语特征** - 保持语气词（嗯、啊、那个等），但可以删除过多的重复
+6. **补全不完整表达** - 根据上下文补全明显缺失的词语，提高可读性
+7. **严格保持原始语言** - 不要翻译，保持原意和主要观点不变
+8. 添加适当的标点符号，提升阅读体验
 
-**格式优化：**
-1. 按照语义和对话逻辑进行合理分段
-2. 在问答转换、话题转换处换行或空行
-3. 保留口语化表达和语气词（嗯、啊、那个等）
-4. 让整体排版清晰易读
+**格式优化（播客对话分段优先）：**
+1. **智能识别播客对话结构并按对话逻辑分段**：
+   - **问答边界分段** - 当主持人提出问题和嘉宾开始回答时分段
+   - **发言人转换分段** - 当发言人从一个人转换到另一个人时分段
+   - **话题转换分段** - 当讨论主题发生明显转换时分段
+   - **完整思路分段** - 当一个完整的观点或论述表达完毕时分段
+2. **保持对话的自然流程** - 每个段落应该是一个相对完整的对话单元
+3. 每个段落之间必须有一个空行分隔（两个换行符）
+4. **适度保留口语特征** - 保持自然的语气词和对话特色，但删除影响阅读的过度重复
+5. 确保输出的是标准markdown格式，段落间有空行
+6. 让播客对话具有良好的阅读流畅性和对话感
 
-**注意：这是对话/访谈内容，请保持对话的原始风格和完整性**
+**核心原则：生成清晰、易读、准确的播客转录文本，在保持原意的前提下优化对话表达质量。**
+
+**特别注意：如果文本开头有[上文续：...]标记，这是为了提供上下文避免断句错误。请遵循以下规则：
+1. 利用上下文理解句子的完整含义，确保优化的连贯性
+2. 绝对不要在输出中包含[上文续：...]标记
+3. 绝对不要重复输出上下文中已有的内容
+4. 只优化和输出标记后的新内容部分**
 
 原始转录文本：
 ${chunkText}` :
             `Please intelligently optimize and format the following audio transcript text:
 
-**Content Optimization:**
-1. Correct obvious typos and spelling errors
-2. Fix homophones and word confusion errors
-3. Intelligently identify and correct brand name transcription errors (carefully analyze brand names in text and determine if they are mistranscribed famous companies)
-4. Repair grammatically awkward sentences for natural flow
-5. Add missing punctuation and correct punctuation errors
-6. Maintain original meaning and tone, don't remove or add content
+**Content Optimization (Accuracy & Readability First):**
+1. **Fix all obvious errors** - Including transcription errors, fragment errors, incomplete words/sentences
+2. Correct typos and spelling errors, fix homophone confusions
+3. Intelligently identify and correct brand names and proper noun transcription errors
+4. **Moderately improve grammar and expression** - Make expressions clearer and more fluent while preserving original meaning
+5. **Preserve important speaking characteristics** - Keep natural filler words (um, ah, like, you know, etc.) but remove excessive repetitions
+6. **Complete incomplete expressions** - Use context to complete obviously missing words for better readability
+7. **Strictly maintain original language** - No translation, preserve original meaning and main points
+8. Add appropriate punctuation to enhance reading experience
 
-**Format Optimization:**
-1. **Must break into reasonable paragraphs based on semantic logic - don't leave as one giant paragraph**
-2. Add line breaks at topic transitions and logical shifts
-3. Each paragraph should not exceed 3-4 sentences for readability
-4. Preserve colloquial expressions and filler words (um, ah, etc.)
-5. Ensure overall layout is clear and readable with proper paragraph spacing
-4. Make overall layout clear and readable
+**Format Optimization (Podcast Dialogue Segmentation Priority):**
+1. **Intelligently recognize podcast dialogue structure and segment by conversational logic**:
+   - **Question-Answer boundary segmentation** - Create breaks when hosts ask questions and guests begin answering
+   - **Speaker transition segmentation** - Create breaks when speakers change from one person to another
+   - **Topic transition segmentation** - Create breaks when discussion topics clearly shift
+   - **Complete thought segmentation** - Create breaks when a complete viewpoint or argument is fully expressed
+2. **Maintain natural conversation flow** - Each paragraph should be a relatively complete conversational unit
+3. Each paragraph must be separated by a blank line (double line breaks)
+4. **Moderately preserve speaking characteristics** - Keep natural filler words and conversational style but remove excessive repetitions that hinder reading
+5. Ensure output is in standard markdown format with blank lines between paragraphs
+6. Make podcast dialogue have good reading fluency and conversational feel
 
-**Note: This is dialogue/interview content, please maintain the original conversational style and completeness**
+**Core Principle: Generate clear, readable, and accurate podcast transcript text that optimizes dialogue expression quality while preserving original meaning.**
+
+**Special Note: If the text begins with [Context continued: ...] markers, this is provided to avoid fragmentation errors. Please follow these rules:
+1. Use the context to understand the complete meaning of sentences and ensure optimization coherence
+2. Absolutely do not include [Context continued: ...] markers in your output
+3. Absolutely do not repeat content that already exists in the context
+4. Only optimize and output the new content part after the marker**
 
 Original transcript text:
 ${chunkText}`;
@@ -802,7 +1150,8 @@ ${chunkText}`;
             temperature: 0.1
         });
 
-        return response.choices[0].message.content.trim();
+        const optimizedText = response.choices[0].message.content.trim();
+        return ensureMarkdownParagraphs(optimizedText);
         
     } catch (error) {
         console.error('❌ 单块文本优化失败:', error.message);
@@ -811,19 +1160,180 @@ ${chunkText}`;
 }
 
 /**
+ * 检测转录文本的实际语言，用于选择合适的优化提示词
+ * @param {string} transcript - 转录文本
+ * @param {string} audioLanguage - 用户指定的音频语言
+ * @returns {string} - 检测到的语言代码
+ */
+function detectTranscriptLanguage(transcript, audioLanguage) {
+    // 如果用户明确指定了音频语言，直接使用
+    if (audioLanguage && audioLanguage !== 'auto') {
+        return audioLanguage;
+    }
+    
+    // 简单的语言检测逻辑
+    const text = transcript.substring(0, 1000); // 取前1000个字符进行检测
+    
+    // 检测中文字符比例
+    const chineseChars = text.match(/[\u4e00-\u9fff]/g) || [];
+    const chineseRatio = chineseChars.length / text.length;
+    
+    // 检测拉丁字符比例（包括英文、西班牙文、法文、德文等）
+    const latinChars = text.match(/[a-zA-ZÀ-ÿ]/g) || [];
+    const latinRatio = latinChars.length / text.length;
+    
+    // 检测日文字符
+    const japaneseChars = text.match(/[\u3040-\u309f\u30a0-\u30ff]/g) || [];
+    const japaneseRatio = japaneseChars.length / text.length;
+    
+    // 检测韩文字符
+    const koreanChars = text.match(/[\uac00-\ud7af]/g) || [];
+    const koreanRatio = koreanChars.length / text.length;
+    
+    // 检测俄文字符
+    const cyrillicChars = text.match(/[\u0400-\u04ff]/g) || [];
+    const cyrillicRatio = cyrillicChars.length / text.length;
+    
+    // 根据字符比例判断语言
+    if (chineseRatio > 0.3) {
+        console.log(`🔍 检测到中文内容，使用中文优化提示词 (中文字符比例: ${(chineseRatio * 100).toFixed(1)}%)`);
+        return 'zh';
+    } else if (japaneseRatio > 0.1) {
+        console.log(`🔍 检测到日文内容，使用英文优化提示词 (日文字符比例: ${(japaneseRatio * 100).toFixed(1)}%)`);
+        return 'en';
+    } else if (koreanRatio > 0.1) {
+        console.log(`🔍 检测到韩文内容，使用英文优化提示词 (韩文字符比例: ${(koreanRatio * 100).toFixed(1)}%)`);
+        return 'en';
+    } else if (cyrillicRatio > 0.3) {
+        console.log(`🔍 检测到俄文内容，使用英文优化提示词 (俄文字符比例: ${(cyrillicRatio * 100).toFixed(1)}%)`);
+        return 'en';
+    } else if (latinRatio > 0.5) {
+        console.log(`🔍 检测到拉丁字符内容（英文/西班牙文/法文等），使用英文优化提示词 (拉丁字符比例: ${(latinRatio * 100).toFixed(1)}%)`);
+        return 'en';
+    } else {
+        // 默认使用英文提示词，但不改变转录内容语言
+        console.log(`🔍 语言检测不确定，默认使用英文优化提示词`);
+        return 'en';
+    }
+}
+
+/**
+ * 确保文本段落格式正确，添加必要的空行
+ * @param {string} text - 需要格式化的文本
+ * @returns {string} - 格式化后的文本
+ */
+function ensureMarkdownParagraphs(text) {
+    if (!text) return text;
+    
+    let formatted = text;
+    
+    // 第一步：标准化换行符
+    formatted = formatted.replace(/\r\n/g, '\n'); // 统一换行符
+    
+    // 第二步：确保Markdown元素后有正确的段落分隔
+    // 标题后面确保有双换行
+    formatted = formatted.replace(/(^#{1,6}\s+.*)\n([^\n#])/gm, '$1\n\n$2');
+    
+    // 列表项后确保有段落分隔
+    formatted = formatted.replace(/(\n[-*+]\s+.*)\n([^\n\-*+\s])/g, '$1\n\n$2');
+    
+    // 引用块后确保有段落分隔
+    formatted = formatted.replace(/(\n>.*)\n([^\n>])/g, '$1\n\n$2');
+    
+    // 第三步：清理格式
+    // 移除行首尾多余空格
+    const lines = formatted.split('\n');
+    const cleanedLines = lines.map(line => line.trim());
+    formatted = cleanedLines.join('\n');
+    
+    // 标准化段落间距：最多保留双换行
+    formatted = formatted.replace(/\n{3,}/g, '\n\n');
+    
+    // 移除开头和结尾的空行
+    formatted = formatted.replace(/^\n+/, '').replace(/\n+$/, '');
+    
+    return formatted;
+}
+
+/**
+ * 智能分割超长文本块，避免在句子中间分割
+ */
+function smartSplitLongChunk(text, maxCharsPerChunk) {
+    const chunks = [];
+    let currentPos = 0;
+    
+    while (currentPos < text.length) {
+        let endPos = Math.min(currentPos + maxCharsPerChunk, text.length);
+        
+        // 如果不是最后一块，寻找安全的分割点
+        if (endPos < text.length) {
+            // 优先在句子边界分割
+            const sentenceEnd = text.lastIndexOf('.', endPos);
+            const questionEnd = text.lastIndexOf('?', endPos);
+            const exclamationEnd = text.lastIndexOf('!', endPos);
+            const chinesePeriod = text.lastIndexOf('。', endPos);
+            const chineseQuestion = text.lastIndexOf('？', endPos);
+            const chineseExclamation = text.lastIndexOf('！', endPos);
+            
+            const sentenceBoundary = Math.max(sentenceEnd, questionEnd, exclamationEnd, 
+                                            chinesePeriod, chineseQuestion, chineseExclamation);
+            
+            if (sentenceBoundary > currentPos + maxCharsPerChunk * 0.7) {
+                endPos = sentenceBoundary + 1;
+            } else {
+                // 在单词边界分割（空格）
+                const spaceBoundary = text.lastIndexOf(' ', endPos);
+                if (spaceBoundary > currentPos + maxCharsPerChunk * 0.8) {
+                    endPos = spaceBoundary;
+                }
+                // 如果找不到好的分割点，保持原来的endPos（但这种情况很少）
+            }
+        }
+        
+        chunks.push(text.substring(currentPos, endPos).trim());
+        currentPos = endPos;
+    }
+    
+    return chunks.filter(chunk => chunk.length > 0);
+}
+
+/**
+ * 检测两段文本之间的重复内容
+ */
+function findOverlapBetweenTexts(text1, text2) {
+    let overlap = '';
+    const maxLength = Math.min(text1.length, text2.length);
+    
+    // 从最长可能的重复开始检查，逐渐减少长度
+    for (let length = maxLength; length >= 20; length--) {
+        const suffix = text1.slice(-length);
+        const prefix = text2.slice(0, length);
+        
+        if (suffix === prefix) {
+            overlap = suffix;
+            break;
+        }
+    }
+    
+    return overlap;
+}
+
+/**
  * 分块处理超长转录文本
  */
-async function formatLongTranscriptInChunks(rawTranscript, outputLanguage, maxCharsPerChunk) {
+async function formatLongTranscriptInChunks(rawTranscript, transcriptLanguage, maxCharsPerChunk) {
     try {
-        // 智能分块：优先按标点符号，其次按空格，最后强制分割
+        // 智能分块：确保不在句子中间分割，保持上下文完整性
         let chunks = [];
         
-        // 尝试按标点符号分块
-        const sentences = rawTranscript.split(/[。！？\n]+/).filter(s => s.trim());
+        // 使用更智能的分句方式，支持中英文标点
+        const sentences = rawTranscript.split(/([。！？\.!?]+\s*)/).filter(s => s.trim());
         let currentChunk = '';
         
-        for (const sentence of sentences) {
-            const testChunk = currentChunk + (currentChunk ? '。' : '') + sentence;
+        for (let i = 0; i < sentences.length; i += 2) {
+            const sentence = sentences[i] + (sentences[i + 1] || '');
+            const testChunk = currentChunk + sentence;
+            
             if (testChunk.length > maxCharsPerChunk && currentChunk) {
                 chunks.push(currentChunk.trim());
                 currentChunk = sentence;
@@ -836,16 +1346,15 @@ async function formatLongTranscriptInChunks(rawTranscript, outputLanguage, maxCh
             chunks.push(currentChunk.trim());
         }
         
-        // 如果分块仍然太大，强制按字符数分割
+        // 对于仍然超长的块，使用更安全的分割方式
         const finalChunks = [];
         for (const chunk of chunks) {
             if (chunk.length <= maxCharsPerChunk) {
                 finalChunks.push(chunk);
             } else {
-                // 强制分割大块
-                for (let i = 0; i < chunk.length; i += maxCharsPerChunk) {
-                    finalChunks.push(chunk.substring(i, i + maxCharsPerChunk));
-                }
+                // 寻找安全的分割点（空格、标点符号）
+                const safeChunks = smartSplitLongChunk(chunk, maxCharsPerChunk);
+                finalChunks.push(...safeChunks);
             }
         }
         
@@ -858,8 +1367,33 @@ async function formatLongTranscriptInChunks(rawTranscript, outputLanguage, maxCh
             console.log(`🔄 处理第 ${i + 1}/${chunks.length} 块 (${chunks[i].length} 字符)`);
             
             try {
-                // 直接调用OpenAI，避免递归循环
-                const optimizedChunk = await formatSingleChunk(chunks[i], outputLanguage);
+                // 为非首块添加前文上下文，避免断句错误
+                let chunkWithContext = chunks[i];
+                let contextMarker = '';
+                if (i > 0) {
+                    // 取前一块的最后100字符作为上下文
+                    const prevContext = chunks[i - 1].slice(-100);
+                    
+                    // 根据语言使用对应的上下文标记
+                    if (transcriptLanguage === 'zh') {
+                        contextMarker = `[上文续：${prevContext}]`;
+                    } else {
+                        contextMarker = `[Context continued: ${prevContext}]`;
+                    }
+                    
+                    chunkWithContext = `${contextMarker}\n\n${chunks[i]}`;
+                    console.log(`📎 第 ${i + 1} 块添加了上下文 (${prevContext.length} 字符)`);
+                }
+                
+                // 调用优化函数
+                let optimizedChunk = await formatSingleChunk(chunkWithContext, transcriptLanguage);
+                
+                // 如果添加了上下文，移除上下文标记部分
+                if (i > 0) {
+                    // 移除中文或英文的上下文标记
+                    optimizedChunk = optimizedChunk.replace(/^\[(上文续|Context continued)：?:?.*?\]\s*/s, '');
+                }
+                
                 optimizedChunks.push(optimizedChunk);
                 
                 // 添加延迟避免API限制
@@ -872,7 +1406,32 @@ async function formatLongTranscriptInChunks(rawTranscript, outputLanguage, maxCh
             }
         }
         
-        const result = optimizedChunks.join('\n\n');
+        // 智能去重：检测相邻块之间的重复内容
+        const deduplicatedChunks = [];
+        for (let i = 0; i < optimizedChunks.length; i++) {
+            let currentChunk = optimizedChunks[i];
+            
+            if (i > 0 && deduplicatedChunks.length > 0) {
+                // 检查当前块开头是否与前一块结尾重复
+                const prevChunk = deduplicatedChunks[deduplicatedChunks.length - 1];
+                const prevEnd = prevChunk.slice(-200); // 取前一块的最后200字符
+                const currentStart = currentChunk.slice(0, 200); // 取当前块的前200字符
+                
+                // 寻找重复的句子或片段
+                const overlapMatch = findOverlapBetweenTexts(prevEnd, currentStart);
+                if (overlapMatch.length > 20) { // 如果重复内容超过20字符
+                    console.log(`🔍 检测到重复内容，自动去重: ${overlapMatch.length} 字符`);
+                    currentChunk = currentChunk.substring(overlapMatch.length);
+                }
+            }
+            
+            if (currentChunk.trim()) {
+                deduplicatedChunks.push(currentChunk);
+            }
+        }
+        
+        const combinedText = deduplicatedChunks.join('\n\n');
+        const result = ensureMarkdownParagraphs(combinedText);
         console.log(`✅ 分块优化完成: ${rawTranscript.length} → ${result.length} 字符`);
         
         return result;

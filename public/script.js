@@ -74,13 +74,38 @@ const translations = {
     }
 };
 
-// 当前语言状态
-let currentLang = 'zh';
+// 检测浏览器语言设置
+function detectBrowserLanguage() {
+    // 尝试从localStorage获取用户之前的选择
+    const savedLang = localStorage.getItem('podcast-transcriber-language');
+    if (savedLang && (savedLang === 'zh' || savedLang === 'en')) {
+        return savedLang;
+    }
+    
+    // 检测浏览器语言
+    const browserLang = navigator.language || navigator.userLanguage || 'en';
+    
+    // 如果是中文（包括简体、繁体、香港、台湾等），返回中文
+    if (browserLang.toLowerCase().startsWith('zh')) {
+        return 'zh';
+    }
+    
+    // 默认返回英文
+    return 'en';
+}
+
+// 当前语言状态 - 根据浏览器语言自动检测
+let currentLang = detectBrowserLanguage();
 
 // 语言切换功能
 function toggleLanguage() {
     currentLang = currentLang === 'zh' ? 'en' : 'zh';
+    
+    // 保存用户的语言选择
+    localStorage.setItem('podcast-transcriber-language', currentLang);
+    
     updateUI();
+    updateLanguageToggle();
     
     // 更新HTML lang属性
     document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
@@ -520,11 +545,8 @@ document.getElementById('podcastUrl').addEventListener('input', function(e) {
     }
 });
 
-// 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', function() {
-    updateUI();
-    
-    // 监听操作类型变化，显示/隐藏总结语言选择
+// 监听操作类型变化的函数（将在主初始化中调用）
+function setupOperationTypeListeners() {
     const operationRadios = document.querySelectorAll('input[name="operation"]');
     operationRadios.forEach(radio => {
         radio.addEventListener('change', function() {
@@ -538,7 +560,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-});
+}
 
 // 显示下载按钮
 function showDownloadButtons(savedFiles) {
@@ -553,8 +575,13 @@ function showDownloadButtons(savedFiles) {
     // 清空之前的链接
     downloadButtons.innerHTML = '';
     
-    // 为每个保存的文件创建下载链接
+    // 为每个保存的文件创建下载链接（过滤掉原始转录）
     savedFiles.forEach(file => {
+        // 只显示优化后的转录和AI总结，不显示原始转录
+        if (file.type === 'original_transcript') {
+            return; // 跳过原始转录文件
+        }
+        
         const link = document.createElement('a');
         link.href = `/api/download/${file.filename}`;
         link.download = file.filename;
@@ -632,12 +659,7 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-// 语言切换功能
-function toggleLanguage() {
-    currentLang = currentLang === 'zh' ? 'en' : 'zh';
-    updateUI();
-    updateLanguageToggle();
-}
+// 语言切换功能已在上方定义，此处移除重复
 
 // 更新语言切换按钮
 function updateLanguageToggle() {
@@ -650,76 +672,14 @@ function updateLanguageToggle() {
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
+    // 设置正确的语言属性
+    document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
+    
     updateUI();
     updateLanguageToggle();
     
-    // 页面加载时检查是否有已完成的文件
-    checkForCompletedFilesOnLoad();
+    // 设置操作类型监听器
+    setupOperationTypeListeners();
 });
 
-// 页面加载时检查已完成的文件
-async function checkForCompletedFilesOnLoad() {
-    try {
-        console.log('🔄 检查是否有已完成的处理结果...');
-        
-        const response = await fetch('/api/temp-files');
-        if (!response.ok) {
-            return; // 静默失败，不影响页面正常使用
-        }
-        
-        const result = await response.json();
-        const allFiles = result.files || [];
-        
-        // 查找最新的转录和总结文件
-        const transcriptFiles = allFiles.filter(f => f.filename.includes('_transcript.md'));
-        const summaryFiles = allFiles.filter(f => f.filename.includes('_summary.md'));
-        
-        if (transcriptFiles.length > 0) {
-            // 找到转录文件，获取最新的一组
-            const latestTranscript = transcriptFiles[0]; // 文件已按修改时间排序
-            const latestSummary = summaryFiles.find(f => 
-                f.filename.startsWith(latestTranscript.filename.split('_transcript')[0])
-            );
-            
-            console.log('✅ 发现已完成的处理结果');
-            
-            // 读取文件内容并显示
-            const transcriptContent = await fetchFileContent(latestTranscript.filename);
-            
-            const mockResult = {
-                transcript: transcriptContent,
-                summary: latestSummary ? await fetchFileContent(latestSummary.filename) : null,
-                language: 'zh',
-                savedFiles: [
-                    {
-                        type: 'transcript',
-                        filename: latestTranscript.filename,
-                        size: latestTranscript.size
-                    }
-                ]
-            };
-            
-            if (latestSummary) {
-                mockResult.savedFiles.push({
-                    type: 'summary', 
-                    filename: latestSummary.filename,
-                    size: latestSummary.size
-                });
-            }
-            
-            // 显示结果
-            const operation = latestSummary ? 'transcribe_summarize' : 'transcribe_only';
-            showResultsContent(mockResult, operation);
-            
-            // 显示提示消息
-            const successMsg = currentLang === 'zh' ? 
-                '💡 页面已自动加载最近的处理结果' : 
-                '💡 Latest processing results loaded automatically';
-            console.log(successMsg);
-        }
-        
-    } catch (error) {
-        console.log('🔍 没有发现已完成的处理结果');
-        // 静默失败，不影响页面正常使用
-    }
-}
+// 移除了自动检查已完成文件的功能，让用户每次都有干净的开始

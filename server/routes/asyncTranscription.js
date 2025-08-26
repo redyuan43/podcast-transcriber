@@ -182,7 +182,7 @@ async function processTranscriptionAsync(taskId, filePath, shouldSummarize, outp
         
         // 执行转录
         console.log(`🎤 处理文件: ${task.filename}`);
-        const result = await processAudioWithOpenAI([filePath], shouldSummarize, outputLanguage);
+        const result = await processAudioWithOpenAI([filePath], shouldSummarize, outputLanguage, null, audioLanguage);
         
         task.progress = 80;
         
