@@ -465,57 +465,49 @@ async function formatTranscriptText(rawTranscript, transcriptLanguage = 'zh') {
         const prompt = transcriptLanguage === 'zh' ? 
             `请对以下音频转录文本进行智能优化和格式化，要求：
 
-**内容优化（正确性与可读性优先）：**
-1. **修复所有明显错误** - 包括转录错误、断句错误、不完整词句等
-2. 纠正错别字和拼写错误，修正同音字混淆
-3. 智能识别并修正品牌名称、专有名词的音译错误
-4. **适度改善语法和表达** - 在保持原意的前提下，让表达更清晰流畅
-5. **保留重要的口语特征** - 保持语气词（嗯、啊、那个等），但可以删除过多的重复
-6. **补全不完整表达** - 根据上下文补全明显缺失的词语，提高可读性
-7. **严格保持原始语言** - 不要翻译，保持原意和主要观点不变
-8. 添加适当的标点符号，提升阅读体验
+**内容优化（正确性优先）：**
+1. **错误修正**：转录错误、错别字、同音字混淆、品牌名称/专有名词音译错误
+2. **表达优化**：适度改善语法，补全不完整句子，保持原意和语言不变
+3. **口语处理**：保留自然语气词（嗯、啊、那个），删除过度重复，添加合适标点
 
-**格式优化（播客对话分段优先）：**
-1. **智能识别播客对话结构并按对话逻辑分段**：
-   - **问答边界分段** - 当主持人提出问题和嘉宾开始回答时分段
-   - **发言人转换分段** - 当发言人从一个人转换到另一个人时分段
-   - **话题转换分段** - 当讨论主题发生明显转换时分段
-   - **完整思路分段** - 当一个完整的观点或论述表达完毕时分段
-2. **保持对话的自然流程** - 每个段落应该是一个相对完整的对话单元
-3. 每个段落之间必须有一个空行分隔（两个换行符）
-4. **适度保留口语特征** - 保持自然的语气词和对话特色，但删除影响阅读的过度重复
-5. 确保输出的是标准markdown格式，段落间有空行
-6. 让播客对话具有良好的阅读流畅性和对话感
+**分段规则（按优先级）：**
+1. **强制分段边界**：
+   - 商业内容转换：广告→正题，不同品牌切换
+   - 节目环节转换：开场→正题→结尾
+   - 发言人变化：主持人↔嘉宾，问答边界
+2. **话题转换分段**：
+   - 内容类型：技术细节→商业成就→数据统计→行业挑战→未来展望
+   - 论述角度：产品介绍→公司发展→环保影响→解决方案
+   - 时间线：过去经历→现在成就→未来计划
+3. **长度控制**：单段不超过200字，超长必须按完整思路分段
 
-**核心原则：生成清晰、易读、准确的播客转录文本，在保持原意的前提下优化对话表达质量。**
+**格式要求**：Markdown格式，段落间用双换行分隔，保持对话自然流畅性
+
+**核心原则**：优化可读性的同时保持原意，长篇论述按话题转换合理分段
 
 原始转录文本：
 ${rawTranscript}` :
             `Please intelligently optimize and format the following audio transcript text:
 
-**Content Optimization (Accuracy & Readability First):**
-1. **Fix all obvious errors** - Including transcription errors, fragment errors, incomplete words/sentences
-2. Correct typos and spelling errors, fix homophone confusions
-3. Intelligently identify and correct brand names and proper noun transcription errors
-4. **Moderately improve grammar and expression** - Make expressions clearer and more fluent while preserving original meaning
-5. **Preserve important speaking characteristics** - Keep natural filler words (um, ah, like, you know, etc.) but remove excessive repetitions
-6. **Complete incomplete expressions** - Use context to complete obviously missing words for better readability
-7. **Strictly maintain original language** - No translation, preserve original meaning and main points
-8. Add appropriate punctuation to enhance reading experience
+**Content Optimization (Accuracy First):**
+1. **Error Correction**: Transcription errors, typos, homophone confusions, brand names/proper noun errors
+2. **Expression Enhancement**: Moderate grammar improvement, complete incomplete sentences, preserve original meaning and language
+3. **Speech Processing**: Keep natural filler words (um, ah, like, you know), remove excessive repetitions, add appropriate punctuation
 
-**Format Optimization (Podcast Dialogue Segmentation Priority):**
-1. **Intelligently recognize podcast dialogue structure and segment by conversational logic**:
-   - **Question-Answer boundary segmentation** - Create breaks when hosts ask questions and guests begin answering
-   - **Speaker transition segmentation** - Create breaks when speakers change from one person to another
-   - **Topic transition segmentation** - Create breaks when discussion topics clearly shift
-   - **Complete thought segmentation** - Create breaks when a complete viewpoint or argument is fully expressed
-2. **Maintain natural conversation flow** - Each paragraph should be a relatively complete conversational unit
-3. Each paragraph must be separated by a blank line (double line breaks)
-4. **Moderately preserve speaking characteristics** - Keep natural filler words and conversational style but remove excessive repetitions that hinder reading
-5. Ensure output is in standard markdown format with blank lines between paragraphs
-6. Make podcast dialogue have good reading fluency and conversational feel
+**Segmentation Rules (By Priority):**
+1. **Mandatory Segmentation Boundaries**:
+   - Commercial content transitions: ads→main content, brand switching
+   - Program segment transitions: opening→main content→ending
+   - Speaker changes: host↔guest, question-answer boundaries
+2. **Topic Transition Segmentation**:
+   - Content types: technical details→business achievements→data statistics→industry challenges→future outlook
+   - Perspective shifts: product introduction→company development→environmental impact→solutions
+   - Timeline: past experiences→current achievements→future plans
+3. **Length Control**: Single paragraphs should not exceed 300 words, long content must be segmented by complete thoughts
 
-**Core Principle: Generate clear, readable, and accurate podcast transcript text that optimizes dialogue expression quality while preserving original meaning.**
+**Format Requirements**: Markdown format, double line breaks between paragraphs, maintain natural conversational flow
+
+**Core Principle**: Optimize readability while preserving original meaning, segment long monologues by topic transitions
 
 Original transcript text:
 ${rawTranscript}`;
@@ -681,9 +673,8 @@ function getSystemPromptByLanguage(outputLanguage) {
 4. **思考内容的逻辑流程，合理划分段落边界**
 
 格式要求：
-1. 使用markdown格式，可以包含标题、列表等元素
-2. 确保段落间有空行，便于阅读
-3. 每个段落应该是完整的逻辑单元
+1. 使用Markdown格式，段落之间使用双换行
+2. 每个段落应是完整的逻辑单元
 
 请仔细分析内容的语意结构，按逻辑主题合理分段。**必须使用中文输出。**`,
 
@@ -714,9 +705,8 @@ Paragraph Organization Requirements (Core):
 4. **Think about the logical flow of content and reasonably divide paragraph boundaries**
 
 Format requirements:
-1. Use markdown format, may include headings, lists, and other elements
-2. Ensure blank lines between paragraphs for readability
-3. Each paragraph should be a complete logical unit
+1. Use Markdown format with double line breaks between paragraphs
+2. Each paragraph should be a complete logical unit
 
 Please carefully analyze the semantic structure of the content and organize paragraphs logically by themes. **Must output in English.**`,
 
@@ -730,10 +720,8 @@ Requisitos del resumen:
 5. Retener apropiadamente el estilo de expresión y puntos de vista importantes de los anfitriones/invitados
 
 Requisitos de formato (Importante):
-1. Debe organizar el contenido por temas o segmentos lógicos
-2. Cada párrafo debe estar separado por una línea en blanco (doble salto de línea)
-3. Asegurar que la salida esté en formato markdown estándar con líneas en blanco entre párrafos
-4. Puede usar encabezados, listas y otros elementos markdown para mejorar la estructura
+1. Usar formato Markdown, con doble salto de línea entre párrafos
+2. Cada párrafo debe ser una unidad lógica completa
 
 Por favor, genera un resumen estructurado del contenido del podcast con puntos clave y contenido esencial. La salida debe seguir los requisitos de formato markdown. **Debe generar la salida en español.**`,
 
@@ -747,10 +735,8 @@ Exigences du résumé :
 5. Conserver de manière appropriée le style d'expression et les points de vue importants des hôtes/invités
 
 Exigences de format (Important) :
-1. Doit organiser le contenu par thèmes ou segments logiques
-2. Chaque paragraphe doit être séparé par une ligne vide (double saut de ligne)
-3. S'assurer que la sortie soit en format markdown standard avec des lignes vides entre les paragraphes
-4. Peut utiliser des titres, listes et autres éléments markdown pour améliorer la structure
+1. Utiliser le format Markdown, avec un double saut de ligne entre les paragraphes
+2. Chaque paragraphe doit être une unité logique complète
 
 Veuillez générer un résumé structuré du contenu du podcast avec les points clés et le contenu essentiel. La sortie doit suivre les exigences de format markdown. **Doit générer la sortie en français.**`,
 
@@ -764,10 +750,8 @@ Zusammenfassungsanforderungen:
 5. Ausdrucksstil und wichtige Standpunkte der Moderatoren/Gäste angemessen bewahren
 
 Formatanforderungen (Wichtig):
-1. Muss Inhalte nach Themen oder logischen Segmenten organisieren
-2. Jeder Absatz muss durch eine Leerzeile getrennt sein (doppelter Zeilenumbruch)
-3. Sicherstellen, dass die Ausgabe im Standard-Markdown-Format mit Leerzeilen zwischen Absätzen ist
-4. Kann Überschriften, Listen und andere Markdown-Elemente zur Strukturverbesserung verwenden
+1. Markdown-Format verwenden, mit doppeltem Zeilenumbruch zwischen Absätzen
+2. Jeder Absatz sollte eine vollständige logische Einheit sein
 
 Bitte erstellen Sie eine strukturierte Zusammenfassung des Podcast-Inhalts mit Schlüsselpunkten und wesentlichen Inhalten. Die Ausgabe muss den Markdown-Formatanforderungen entsprechen. **Muss die Ausgabe auf Deutsch generieren.**`
     };
@@ -1067,69 +1051,53 @@ async function formatSingleChunk(chunkText, transcriptLanguage = 'zh') {
         const prompt = transcriptLanguage === 'zh' ? 
             `请对以下音频转录文本进行智能优化和格式化，要求：
 
-**内容优化（正确性与可读性优先）：**
-1. **修复所有明显错误** - 包括转录错误、断句错误、不完整词句等
-2. 纠正错别字和拼写错误，修正同音字混淆
-3. 智能识别并修正品牌名称、专有名词的音译错误
-4. **适度改善语法和表达** - 在保持原意的前提下，让表达更清晰流畅
-5. **保留重要的口语特征** - 保持语气词（嗯、啊、那个等），但可以删除过多的重复
-6. **补全不完整表达** - 根据上下文补全明显缺失的词语，提高可读性
-7. **严格保持原始语言** - 不要翻译，保持原意和主要观点不变
-8. 添加适当的标点符号，提升阅读体验
+**内容优化（正确性优先）：**
+1. **错误修正**：转录错误、错别字、同音字混淆、品牌名称/专有名词音译错误
+2. **表达优化**：适度改善语法，补全不完整句子，保持原意和语言不变
+3. **口语处理**：保留自然语气词（嗯、啊、那个），删除过度重复，添加合适标点
 
-**格式优化（播客对话分段优先）：**
-1. **智能识别播客对话结构并按对话逻辑分段**：
-   - **问答边界分段** - 当主持人提出问题和嘉宾开始回答时分段
-   - **发言人转换分段** - 当发言人从一个人转换到另一个人时分段
-   - **话题转换分段** - 当讨论主题发生明显转换时分段
-   - **完整思路分段** - 当一个完整的观点或论述表达完毕时分段
-2. **保持对话的自然流程** - 每个段落应该是一个相对完整的对话单元
-3. 每个段落之间必须有一个空行分隔（两个换行符）
-4. **适度保留口语特征** - 保持自然的语气词和对话特色，但删除影响阅读的过度重复
-5. 确保输出的是标准markdown格式，段落间有空行
-6. 让播客对话具有良好的阅读流畅性和对话感
+**分段规则（按优先级）：**
+1. **强制分段边界**：
+   - 商业内容转换：广告→正题，不同品牌切换
+   - 节目环节转换：开场→正题→结尾
+   - 发言人变化：主持人↔嘉宾，问答边界
+2. **话题转换分段**：
+   - 内容类型：技术细节→商业成就→数据统计→行业挑战→未来展望
+   - 论述角度：产品介绍→公司发展→环保影响→解决方案
+   - 时间线：过去经历→现在成就→未来计划
+3. **长度控制**：单段不超过200字，超长必须按完整思路分段
 
-**核心原则：生成清晰、易读、准确的播客转录文本，在保持原意的前提下优化对话表达质量。**
+**格式要求**：Markdown格式，段落间用双换行分隔，保持对话自然流畅性
 
-**特别注意：如果文本开头有[上文续：...]标记，这是为了提供上下文避免断句错误。请遵循以下规则：
-1. 利用上下文理解句子的完整含义，确保优化的连贯性
-2. 绝对不要在输出中包含[上文续：...]标记
-3. 绝对不要重复输出上下文中已有的内容
-4. 只优化和输出标记后的新内容部分**
+**核心原则**：优化可读性的同时保持原意，长篇论述按话题转换合理分段
+
+**上下文处理**：如有[上文续：...]标记，利用上下文理解完整含义，但不要在输出中包含标记，不要重复上下文内容，只输出新内容部分
 
 原始转录文本：
 ${chunkText}` :
             `Please intelligently optimize and format the following audio transcript text:
 
-**Content Optimization (Accuracy & Readability First):**
-1. **Fix all obvious errors** - Including transcription errors, fragment errors, incomplete words/sentences
-2. Correct typos and spelling errors, fix homophone confusions
-3. Intelligently identify and correct brand names and proper noun transcription errors
-4. **Moderately improve grammar and expression** - Make expressions clearer and more fluent while preserving original meaning
-5. **Preserve important speaking characteristics** - Keep natural filler words (um, ah, like, you know, etc.) but remove excessive repetitions
-6. **Complete incomplete expressions** - Use context to complete obviously missing words for better readability
-7. **Strictly maintain original language** - No translation, preserve original meaning and main points
-8. Add appropriate punctuation to enhance reading experience
+**Content Optimization (Accuracy First):**
+1. **Error Correction**: Transcription errors, typos, homophone confusions, brand names/proper noun errors
+2. **Expression Enhancement**: Moderate grammar improvement, complete incomplete sentences, preserve original meaning and language
+3. **Speech Processing**: Keep natural filler words (um, ah, like, you know), remove excessive repetitions, add appropriate punctuation
 
-**Format Optimization (Podcast Dialogue Segmentation Priority):**
-1. **Intelligently recognize podcast dialogue structure and segment by conversational logic**:
-   - **Question-Answer boundary segmentation** - Create breaks when hosts ask questions and guests begin answering
-   - **Speaker transition segmentation** - Create breaks when speakers change from one person to another
-   - **Topic transition segmentation** - Create breaks when discussion topics clearly shift
-   - **Complete thought segmentation** - Create breaks when a complete viewpoint or argument is fully expressed
-2. **Maintain natural conversation flow** - Each paragraph should be a relatively complete conversational unit
-3. Each paragraph must be separated by a blank line (double line breaks)
-4. **Moderately preserve speaking characteristics** - Keep natural filler words and conversational style but remove excessive repetitions that hinder reading
-5. Ensure output is in standard markdown format with blank lines between paragraphs
-6. Make podcast dialogue have good reading fluency and conversational feel
+**Segmentation Rules (By Priority):**
+1. **Mandatory Segmentation Boundaries**:
+   - Commercial content transitions: ads→main content, brand switching
+   - Program segment transitions: opening→main content→ending
+   - Speaker changes: host↔guest, question-answer boundaries
+2. **Topic Transition Segmentation**:
+   - Content types: technical details→business achievements→data statistics→industry challenges→future outlook
+   - Perspective shifts: product introduction→company development→environmental impact→solutions
+   - Timeline: past experiences→current achievements→future plans
+3. **Length Control**: Single paragraphs should not exceed 300 words, long content must be segmented by complete thoughts
 
-**Core Principle: Generate clear, readable, and accurate podcast transcript text that optimizes dialogue expression quality while preserving original meaning.**
+**Format Requirements**: Markdown format, double line breaks between paragraphs, maintain natural conversational flow
 
-**Special Note: If the text begins with [Context continued: ...] markers, this is provided to avoid fragmentation errors. Please follow these rules:
-1. Use the context to understand the complete meaning of sentences and ensure optimization coherence
-2. Absolutely do not include [Context continued: ...] markers in your output
-3. Absolutely do not repeat content that already exists in the context
-4. Only optimize and output the new content part after the marker**
+**Core Principle**: Optimize readability while preserving original meaning, segment long monologues by topic transitions
+
+**Context Handling**: If [Context continued: ...] markers exist, use context to understand complete meaning but do not include markers in output, do not repeat context content, only output new content parts
 
 Original transcript text:
 ${chunkText}`;
@@ -1310,12 +1278,55 @@ function findOverlapBetweenTexts(text1, text2) {
         const prefix = text2.slice(0, length);
         
         if (suffix === prefix) {
-            overlap = suffix;
+            // 找到重复内容后，寻找安全的切割点
+            const safeCutPoint = findSafeCutPoint(prefix);
+            if (safeCutPoint > 20) { // 确保仍有足够长度的重复内容
+                overlap = prefix.slice(0, safeCutPoint);
+            } else {
+                overlap = suffix; // 如果找不到安全切割点，使用原逻辑
+            }
             break;
         }
     }
     
     return overlap;
+}
+
+/**
+ * 找到安全的文本切割点，避免在句子中间切断
+ */
+function findSafeCutPoint(text) {
+    // 优先级：段落边界 > 句子边界 > 短语边界
+    
+    // 1. 寻找段落分隔符之前的位置
+    const paragraphMatch = text.lastIndexOf('\n\n');
+    if (paragraphMatch > 0) {
+        return paragraphMatch + 2; // 包含段落分隔符
+    }
+    
+    // 2. 寻找句子边界（中文和英文标点）
+    const sentenceEndings = /[。！？\.!?]\s*/g;
+    let lastSentenceEnd = -1;
+    let match;
+    while ((match = sentenceEndings.exec(text)) !== null) {
+        lastSentenceEnd = match.index + match[0].length;
+    }
+    if (lastSentenceEnd > 20) {
+        return lastSentenceEnd;
+    }
+    
+    // 3. 寻找短语边界（逗号、分号等）
+    const phraseEndings = /[，；,;]\s*/g;
+    let lastPhraseEnd = -1;
+    while ((match = phraseEndings.exec(text)) !== null) {
+        lastPhraseEnd = match.index + match[0].length;
+    }
+    if (lastPhraseEnd > 20) {
+        return lastPhraseEnd;
+    }
+    
+    // 4. 如果都找不到，返回原长度（使用原逻辑）
+    return text.length;
 }
 
 /**
@@ -1421,7 +1432,12 @@ async function formatLongTranscriptInChunks(rawTranscript, transcriptLanguage, m
                 const overlapMatch = findOverlapBetweenTexts(prevEnd, currentStart);
                 if (overlapMatch.length > 20) { // 如果重复内容超过20字符
                     console.log(`🔍 检测到重复内容，自动去重: ${overlapMatch.length} 字符`);
-                    currentChunk = currentChunk.substring(overlapMatch.length);
+                    currentChunk = currentChunk.substring(overlapMatch.length).trim(); // 去除开头空格
+                    
+                    // 如果去重后文本为空或太短，跳过此块
+                    if (currentChunk.length < 10) {
+                        continue;
+                    }
                 }
             }
             

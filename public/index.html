@@ -56,7 +56,7 @@
             transition: width 0.5s ease-out;
         }
         
-        /* 移除prose中的分割线和边框，保持段落间距 */
+        /* 移除prose中的分割线和边框，紧凑段落间距 */
         .prose hr {
             display: none !important;
         }
@@ -66,27 +66,47 @@
             border-bottom: none !important;
         }
         .prose p {
-            margin-bottom: 1rem !important;
+            margin-bottom: 0.5rem !important;
         }
         .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
-            margin-top: 1.5rem !important;
-            margin-bottom: 0.75rem !important;
+            margin-top: 0.75rem !important;
+            margin-bottom: 0.5rem !important;
             border: none !important;
         }
         .prose ul, .prose ol {
-            margin-bottom: 1rem !important;
-        }
-        .prose li {
             margin-bottom: 0.5rem !important;
         }
+        .prose li {
+            margin-bottom: 0.25rem !important;
+        }
         .prose blockquote {
-            margin-top: 1rem !important;
-            margin-bottom: 1rem !important;
+            margin-top: 0.5rem !important;
+            margin-bottom: 0.5rem !important;
             border-left: 4px solid #e2e8f0 !important;
             border-top: none !important;
             border-bottom: none !important;
             border-right: none !important;
         }
+        
+        /* Summary区域应该只有段落，不会有标题等元素 */
+        #summaryText.prose p {
+            margin-bottom: 0.5rem !important;
+        }
+        /* 将summary中的h1~h6视觉上降级为普通段落样式（与transcript一致） */
+        #summaryText.prose h1,
+        #summaryText.prose h2,
+        #summaryText.prose h3,
+        #summaryText.prose h4,
+        #summaryText.prose h5,
+        #summaryText.prose h6 {
+            font-size: 1em !important;
+            font-weight: inherit !important;
+            line-height: inherit !important;
+            margin-top: 0.5rem !important;
+            margin-bottom: 0.5rem !important;
+        }
+        /* 避免summary区域出现分割线 */
+        #summaryText.prose hr { display: none !important; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
@@ -212,7 +232,7 @@
         <!-- Results Section -->
         <div id="resultsSection" class="hidden">
             <div class="glass rounded-2xl shadow-xl border border-white/20 p-8">
-                <h2 class="text-2xl font-bold text-slate-800 mb-4 flex items-center">
+                <h2 class="text-2xl font-bold text-slate-800 mb-1 flex items-center">
                     <span class="text-2xl mr-3">📄</span>
                     <span id="resultsTitle">处理结果</span>
                 </h2>
@@ -307,7 +327,7 @@
                     </div>
 
                     <!-- Download Section -->
-                    <div id="downloadSection" class="hidden my-8">
+                    <div id="downloadSection" class="hidden mt-1 mb-4">
                         <div class="flex flex-wrap gap-6 justify-center" id="downloadButtons">
                             <!-- Download links will be added here by JavaScript -->
                         </div>
