@@ -37,7 +37,7 @@ ${summary}
 
 ---
 
-*本文档由 [Podcast提取器](https://github.com/your-repo/podcast-to-text) 自动生成*
+*本文档由 [Podcast提取器](https://github.com/wendy7756/podcast-transcriber) 自动生成*
 `;
 }
 
@@ -673,7 +673,7 @@ function getSystemPromptByLanguage(outputLanguage) {
 4. **思考内容的逻辑流程，合理划分段落边界**
 
 格式要求：
-1. 使用Markdown格式，段落之间使用双换行
+1. 使用纯文本段落格式，段落之间使用双换行，不使用标题、列表等Markdown元素
 2. 每个段落应是完整的逻辑单元
 
 请仔细分析内容的语意结构，按逻辑主题合理分段。**必须使用中文输出。**`,
@@ -705,7 +705,7 @@ Paragraph Organization Requirements (Core):
 4. **Think about the logical flow of content and reasonably divide paragraph boundaries**
 
 Format requirements:
-1. Use Markdown format with double line breaks between paragraphs
+1. Use plain text paragraph format with double line breaks between paragraphs, no headings, lists or other Markdown elements
 2. Each paragraph should be a complete logical unit
 
 Please carefully analyze the semantic structure of the content and organize paragraphs logically by themes. **Must output in English.**`,
@@ -720,7 +720,7 @@ Requisitos del resumen:
 5. Retener apropiadamente el estilo de expresión y puntos de vista importantes de los anfitriones/invitados
 
 Requisitos de formato (Importante):
-1. Usar formato Markdown, con doble salto de línea entre párrafos
+1. Usar formato de párrafos de texto plano, con doble salto de línea entre párrafos, sin encabezados, listas u otros elementos Markdown
 2. Cada párrafo debe ser una unidad lógica completa
 
 Por favor, genera un resumen estructurado del contenido del podcast con puntos clave y contenido esencial. La salida debe seguir los requisitos de formato markdown. **Debe generar la salida en español.**`,
@@ -735,7 +735,7 @@ Exigences du résumé :
 5. Conserver de manière appropriée le style d'expression et les points de vue importants des hôtes/invités
 
 Exigences de format (Important) :
-1. Utiliser le format Markdown, avec un double saut de ligne entre les paragraphes
+1. Utiliser le format de paragraphes en texte brut, avec un double saut de ligne entre les paragraphes, sans titres, listes ou autres éléments Markdown
 2. Chaque paragraphe doit être une unité logique complète
 
 Veuillez générer un résumé structuré du contenu du podcast avec les points clés et le contenu essentiel. La sortie doit suivre les exigences de format markdown. **Doit générer la sortie en français.**`,
@@ -750,7 +750,7 @@ Zusammenfassungsanforderungen:
 5. Ausdrucksstil und wichtige Standpunkte der Moderatoren/Gäste angemessen bewahren
 
 Formatanforderungen (Wichtig):
-1. Markdown-Format verwenden, mit doppeltem Zeilenumbruch zwischen Absätzen
+1. Klartext-Absatzformat verwenden, mit doppeltem Zeilenumbruch zwischen Absätzen, ohne Überschriften, Listen oder andere Markdown-Elemente
 2. Jeder Absatz sollte eine vollständige logische Einheit sein
 
 Bitte erstellen Sie eine strukturierte Zusammenfassung des Podcast-Inhalts mit Schlüsselpunkten und wesentlichen Inhalten. Die Ausgabe muss den Markdown-Formatanforderungen entsprechen. **Muss die Ausgabe auf Deutsch generieren.**`
@@ -962,7 +962,7 @@ function getFinalSummaryPrompt(outputLanguage) {
 1. 去除重复内容，保持逻辑清晰
 2. 按主题或时间顺序重新组织内容
 3. 每个段落之间必须有一个空行分隔（两个换行符）
-4. 确保输出的是标准markdown格式，段落间有空行
+4. 确保输出的是纯文本段落格式，段落间有空行，不使用标题、列表等Markdown元素
 5. 使用简洁明了的中文
 6. **必须使用中文输出**
 7. 形成一个完整的播客内容总结
@@ -975,7 +975,7 @@ Requirements:
 1. Remove duplicate content and maintain clear logic
 2. Reorganize content by themes or chronological order
 3. Each paragraph must be separated by a blank line (double line breaks)
-4. Ensure output is in standard markdown format with blank lines between paragraphs
+4. Ensure output is in plain text paragraph format with blank lines between paragraphs, no headings, lists or other Markdown elements
 5. Use concise and clear English
 6. **Must output in English**
 7. Form a complete podcast content summary
@@ -988,7 +988,7 @@ Requisitos:
 1. Eliminar contenido duplicado y mantener lógica clara
 2. Reorganizar contenido por temas u orden cronológico
 3. Cada párrafo debe estar separado por una línea en blanco (doble salto de línea)
-4. Asegurar que la salida esté en formato markdown estándar con líneas en blanco entre párrafos
+4. Asegurar que la salida esté en formato de párrafos de texto plano con líneas en blanco entre párrafos, sin encabezados, listas u otros elementos Markdown
 5. Usar español conciso y claro
 6. **Debe generar la salida en español**
 7. Formar un resumen completo del contenido del podcast
@@ -1000,7 +1000,7 @@ Exigences :
 1. Supprimer le contenu dupliqué et maintenir une logique claire
 2. Réorganiser le contenu par thèmes ou ordre chronologique
 3. Chaque paragraphe doit être séparé par une ligne vide (double saut de ligne)
-4. S'assurer que la sortie soit en format markdown standard avec des lignes vides entre les paragraphes
+4. S'assurer que la sortie soit en format de paragraphes en texte brut avec des lignes vides entre les paragraphes, sans titres, listes ou autres éléments Markdown
 5. Utiliser un français concis et clair
 6. **Doit générer la sortie en français**
 7. Former un résumé complet du contenu du podcast
@@ -1012,7 +1012,7 @@ Anforderungen:
 1. Doppelte Inhalte entfernen und klare Logik beibehalten
 2. Inhalte nach Themen oder chronologischer Reihenfolge neu organisieren
 3. Jeder Absatz muss durch eine Leerzeile getrennt sein (doppelter Zeilenumbruch)
-4. Sicherstellen, dass die Ausgabe im Standard-Markdown-Format mit Leerzeilen zwischen Absätzen ist
+4. Sicherstellen, dass die Ausgabe im Klartext-Absatzformat mit Leerzeilen zwischen Absätzen ist, ohne Überschriften, Listen oder andere Markdown-Elemente
 5. Prägnantes und klares Deutsch verwenden
 6. **Muss die Ausgabe auf Deutsch generieren**
 7. Eine vollständige Podcast-Inhaltszusammenfassung bilden

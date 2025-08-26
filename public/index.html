@@ -88,25 +88,16 @@
             border-right: none !important;
         }
         
-        /* Summary区域应该只有段落，不会有标题等元素 */
-        #summaryText.prose p {
-            margin-bottom: 0.5rem !important;
-        }
-        /* 将summary中的h1~h6视觉上降级为普通段落样式（与transcript一致） */
-        #summaryText.prose h1,
-        #summaryText.prose h2,
-        #summaryText.prose h3,
-        #summaryText.prose h4,
-        #summaryText.prose h5,
-        #summaryText.prose h6 {
-            font-size: 1em !important;
+        /* Summary区域：让标题看起来像段落，间距一致 */
+        #summaryText.prose h1, #summaryText.prose h2, #summaryText.prose h3, 
+        #summaryText.prose h4, #summaryText.prose h5, #summaryText.prose h6 {
+            font-size: inherit !important;
             font-weight: inherit !important;
             line-height: inherit !important;
-            margin-top: 0.5rem !important;
+            margin-top: 0 !important;
             margin-bottom: 0.5rem !important;
         }
-        /* 避免summary区域出现分割线 */
-        #summaryText.prose hr { display: none !important; }
+
     </style>
 </head>
 <body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">

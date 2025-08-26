@@ -149,7 +149,7 @@ def format_transcript_as_markdown(transcript_text, original_filename=None):
 
 ---
 
-*本文档由 [Podcast提取器](https://github.com/your-repo/podcast-to-text) 自动生成*
+*本文档由 [Podcast提取器](https://github.com/wendy7756/podcast-transcriber) 自动生成*
 """
     
     return markdown_content

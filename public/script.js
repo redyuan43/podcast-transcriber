@@ -675,6 +675,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // 设置正确的语言属性
     document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
     
+    // 根据浏览器语言设置总结语言的默认值
+    const outputLanguageSelect = document.getElementById('outputLanguage');
+    if (outputLanguageSelect) {
+        outputLanguageSelect.value = currentLang; // 使用浏览器检测的语言
+    }
+    
     updateUI();
     updateLanguageToggle();
     
