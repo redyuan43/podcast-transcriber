@@ -1,10 +1,14 @@
+<div align="center">
+  
 # 🎙️ Podcast Transcriber
 
-[中文](README_zh.md) | English
+English | [中文](README_zh.md)
 
 A professional-grade bilingual podcast transcription and summarization platform that transforms podcast episodes into high-quality text transcripts and AI-powered summaries. 
 
 ![Podcast Transcriber Interface](public/podcast_en.jpeg)
+
+</div>
 
 ## 🌟 Project Overview
 
