@@ -208,6 +208,3 @@ Apache 2.0 License - see [LICENSE](LICENSE) file for details.
 
 Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
 
----
-
-**Built with love for the global podcast community**

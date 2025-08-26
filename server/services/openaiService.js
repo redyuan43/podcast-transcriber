@@ -543,8 +543,8 @@ ${rawTranscript}`;
         
     } catch (error) {
         console.error('❌ 文本优化失败:', error.message);
-        console.warn('🔄 返回原始文本');
-        return rawTranscript; // 失败时返回原文本
+        console.warn('🔄 应用基本格式化');
+        return applyBasicFormatting(rawTranscript); // 失败时使用基本格式化
     }
 }
 
@@ -608,8 +608,8 @@ Please output the optimized text directly in the original language without any e
 
     } catch (error) {
         console.error('❌ 文本优化失败:', error);
-        console.log('📄 返回原始拼接文本');
-        return rawTranscript; // 失败时返回原始文本
+        console.log('📄 应用基本格式化');
+        return applyBasicFormatting(rawTranscript); // 失败时使用基本格式化
     }
 }
 
@@ -673,7 +673,7 @@ function getSystemPromptByLanguage(outputLanguage) {
 4. **思考内容的逻辑流程，合理划分段落边界**
 
 格式要求：
-1. 使用纯文本段落格式，段落之间使用双换行，不使用标题、列表等Markdown元素
+1. 使用Markdown格式，段落之间使用双换行
 2. 每个段落应是完整的逻辑单元
 
 请仔细分析内容的语意结构，按逻辑主题合理分段。**必须使用中文输出。**`,
@@ -705,7 +705,7 @@ Paragraph Organization Requirements (Core):
 4. **Think about the logical flow of content and reasonably divide paragraph boundaries**
 
 Format requirements:
-1. Use plain text paragraph format with double line breaks between paragraphs, no headings, lists or other Markdown elements
+1. Use Markdown format with double line breaks between paragraphs
 2. Each paragraph should be a complete logical unit
 
 Please carefully analyze the semantic structure of the content and organize paragraphs logically by themes. **Must output in English.**`,
@@ -720,7 +720,7 @@ Requisitos del resumen:
 5. Retener apropiadamente el estilo de expresión y puntos de vista importantes de los anfitriones/invitados
 
 Requisitos de formato (Importante):
-1. Usar formato de párrafos de texto plano, con doble salto de línea entre párrafos, sin encabezados, listas u otros elementos Markdown
+1. Usar formato Markdown, con doble salto de línea entre párrafos
 2. Cada párrafo debe ser una unidad lógica completa
 
 Por favor, genera un resumen estructurado del contenido del podcast con puntos clave y contenido esencial. La salida debe seguir los requisitos de formato markdown. **Debe generar la salida en español.**`,
@@ -735,7 +735,7 @@ Exigences du résumé :
 5. Conserver de manière appropriée le style d'expression et les points de vue importants des hôtes/invités
 
 Exigences de format (Important) :
-1. Utiliser le format de paragraphes en texte brut, avec un double saut de ligne entre les paragraphes, sans titres, listes ou autres éléments Markdown
+1. Utiliser le format Markdown, avec un double saut de ligne entre les paragraphes
 2. Chaque paragraphe doit être une unité logique complète
 
 Veuillez générer un résumé structuré du contenu du podcast avec les points clés et le contenu essentiel. La sortie doit suivre les exigences de format markdown. **Doit générer la sortie en français.**`,
@@ -750,7 +750,7 @@ Zusammenfassungsanforderungen:
 5. Ausdrucksstil und wichtige Standpunkte der Moderatoren/Gäste angemessen bewahren
 
 Formatanforderungen (Wichtig):
-1. Klartext-Absatzformat verwenden, mit doppeltem Zeilenumbruch zwischen Absätzen, ohne Überschriften, Listen oder andere Markdown-Elemente
+1. Markdown-Format verwenden, mit doppeltem Zeilenumbruch zwischen Absätzen
 2. Jeder Absatz sollte eine vollständige logische Einheit sein
 
 Bitte erstellen Sie eine strukturierte Zusammenfassung des Podcast-Inhalts mit Schlüsselpunkten und wesentlichen Inhalten. Die Ausgabe muss den Markdown-Formatanforderungen entsprechen. **Muss die Ausgabe auf Deutsch generieren.**`
@@ -962,7 +962,7 @@ function getFinalSummaryPrompt(outputLanguage) {
 1. 去除重复内容，保持逻辑清晰
 2. 按主题或时间顺序重新组织内容
 3. 每个段落之间必须有一个空行分隔（两个换行符）
-4. 确保输出的是纯文本段落格式，段落间有空行，不使用标题、列表等Markdown元素
+4. 确保输出的是Markdown格式，段落间有空行
 5. 使用简洁明了的中文
 6. **必须使用中文输出**
 7. 形成一个完整的播客内容总结
@@ -975,7 +975,7 @@ Requirements:
 1. Remove duplicate content and maintain clear logic
 2. Reorganize content by themes or chronological order
 3. Each paragraph must be separated by a blank line (double line breaks)
-4. Ensure output is in plain text paragraph format with blank lines between paragraphs, no headings, lists or other Markdown elements
+4. Ensure output is in Markdown format with blank lines between paragraphs
 5. Use concise and clear English
 6. **Must output in English**
 7. Form a complete podcast content summary
@@ -988,7 +988,7 @@ Requisitos:
 1. Eliminar contenido duplicado y mantener lógica clara
 2. Reorganizar contenido por temas u orden cronológico
 3. Cada párrafo debe estar separado por una línea en blanco (doble salto de línea)
-4. Asegurar que la salida esté en formato de párrafos de texto plano con líneas en blanco entre párrafos, sin encabezados, listas u otros elementos Markdown
+4. Asegurar que la salida esté en formato Markdown con líneas en blanco entre párrafos
 5. Usar español conciso y claro
 6. **Debe generar la salida en español**
 7. Formar un resumen completo del contenido del podcast
@@ -1000,7 +1000,7 @@ Exigences :
 1. Supprimer le contenu dupliqué et maintenir une logique claire
 2. Réorganiser le contenu par thèmes ou ordre chronologique
 3. Chaque paragraphe doit être séparé par une ligne vide (double saut de ligne)
-4. S'assurer que la sortie soit en format de paragraphes en texte brut avec des lignes vides entre les paragraphes, sans titres, listes ou autres éléments Markdown
+4. S'assurer que la sortie soit en format Markdown avec des lignes vides entre les paragraphes
 5. Utiliser un français concis et clair
 6. **Doit générer la sortie en français**
 7. Former un résumé complet du contenu du podcast
@@ -1123,7 +1123,7 @@ ${chunkText}`;
         
     } catch (error) {
         console.error('❌ 单块文本优化失败:', error.message);
-        return chunkText; // 失败时返回原文本
+        return applyBasicFormatting(chunkText); // 失败时使用基本格式化
     }
 }
 
@@ -1330,6 +1330,53 @@ function findSafeCutPoint(text) {
 }
 
 /**
+ * 应用基本格式化（当AI优化失败时的回退方案）
+ * @param {string} text - 需要格式化的文本
+ * @returns {string} - 基本格式化后的文本
+ */
+function applyBasicFormatting(text) {
+    if (!text || text.trim().length === 0) {
+        return text;
+    }
+    
+    console.log(`📝 应用基本格式化: ${text.length} 字符`);
+    
+    // 按句子分割（支持中英文标点）
+    const sentences = text.split(/([。！？\.!?]+\s*)/).filter(s => s.trim());
+    const paragraphs = [];
+    let currentParagraph = '';
+    const maxParagraphLength = 200; // 单段最大字符数
+    
+    for (let i = 0; i < sentences.length; i += 2) {
+        const sentence = sentences[i] + (sentences[i + 1] || '');
+        const testParagraph = currentParagraph + sentence;
+        
+        if (testParagraph.length > maxParagraphLength && currentParagraph) {
+            // 当前段落已够长，开始新段落
+            paragraphs.push(currentParagraph.trim());
+            currentParagraph = sentence;
+        } else {
+            currentParagraph = testParagraph;
+        }
+    }
+    
+    // 添加最后一段
+    if (currentParagraph.trim()) {
+        paragraphs.push(currentParagraph.trim());
+    }
+    
+    // 用双换行连接段落
+    const formatted = paragraphs.join('\n\n');
+    
+    // 应用Markdown段落格式化
+    const result = ensureMarkdownParagraphs(formatted);
+    
+    console.log(`✅ 基本格式化完成: ${text.length} → ${result.length} 字符，${paragraphs.length} 段`);
+    
+    return result;
+}
+
+/**
  * 分块处理超长转录文本
  */
 async function formatLongTranscriptInChunks(rawTranscript, transcriptLanguage, maxCharsPerChunk) {
@@ -1413,7 +1460,9 @@ async function formatLongTranscriptInChunks(rawTranscript, transcriptLanguage, m
                 }
             } catch (chunkError) {
                 console.warn(`⚠️ 第 ${i + 1} 块优化失败，使用原始文本: ${chunkError.message}`);
-                optimizedChunks.push(chunks[i]);
+                // 应用基本格式化，而不是直接使用原始文本
+                const basicFormatted = applyBasicFormatting(chunks[i]);
+                optimizedChunks.push(basicFormatted);
             }
         }
         
@@ -1454,7 +1503,7 @@ async function formatLongTranscriptInChunks(rawTranscript, transcriptLanguage, m
         
     } catch (error) {
         console.error('❌ 分块优化失败:', error.message);
-        return rawTranscript;
+        return applyBasicFormatting(rawTranscript);
     }
 }
 
