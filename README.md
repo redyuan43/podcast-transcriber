@@ -1,21 +1,23 @@
-# 🎙️ Podcast Extractor
+# 🎙️ Podcast Transcriber
 
-**[中文](README_zh.md) | English**
+[中文](README_zh.md) | English
 
-A professional-grade bilingual podcast transcription and summarization platform that transforms podcast episodes into high-quality text transcripts and AI-powered summaries. Built with modern web technologies, **local Faster-Whisper transcription**, and intelligent audio processing capabilities for maximum performance and privacy.
+A professional-grade bilingual podcast transcription and summarization platform that transforms podcast episodes into high-quality text transcripts and AI-powered summaries. 
+
+![Podcast Transcriber Interface](public/podcast_en.jpeg)
 
 ## 🌟 Project Overview
 
-Podcast Extractor is a full-stack web application designed to bridge the gap between audio content and text accessibility. It automatically processes podcast episodes from various platforms, and delivers accurate transcriptions with meaningful summaries in multiple languages.
+Podcast Transcriber is a full-stack web application designed to bridge the gap between audio content and text accessibility. It automatically processes podcast episodes from various platforms, and delivers accurate transcriptions with meaningful summaries in multiple languages.
 
 ### Key Capabilities
 
-- **🚀 Local Faster-Whisper Transcription**: Ultra-fast local speech-to-text (8.4x real-time speed)
+- **🚀 Local Faster-Whisper Transcription**: Ultra-fast local speech-to-text
 - **💾 File Download Support**: Automatic saving of transcripts and summaries with download functionality  
 - **🔗 Multi-Platform Support**: Extract audio from Apple Podcasts, Xiaoyuzhou, RSS feeds, and direct audio URLs
 - **🎵 Intelligent Audio Processing**: Direct processing of large files without size limitations
 - **🤖 AI-Powered Optimization**: Seamless text continuity optimization and structured summarization
-- **🔒 Privacy-First**: Local transcription with minimal data sharing (only text summaries use external AI)
+- **🔒 Privacy-First**: Local transcription with minimal data sharing (only text optimization and podcast content summarization use external AI)
 - **🌍 Bilingual Interface**: Native Chinese and English support with dynamic language switching
 - **📱 Responsive Design**: Modern, mobile-first UI built with TailwindCSS
 
@@ -48,7 +50,7 @@ Podcast Extractor is a full-stack web application designed to bridge the gap bet
 
 1. **Podcast Link Analysis**: Multi-strategy URL parsing for Apple Podcasts, Xiaoyuzhou, and RSS feeds
 2. **Audio Extraction**: Direct download with RSS feed discovery and API integration  
-3. **Local Transcription**: High-speed Faster-Whisper processing (8.4x real-time speed)
+3. **Local Transcription**: High-speed Faster-Whisper processing
 4. **Text Optimization**: AI-powered continuity enhancement and flow improvement
 5. **Summarization**: Structured content analysis and key point extraction
 6. **File Export**: Automatic saving of transcripts and summaries with download links
@@ -64,12 +66,12 @@ Podcast Extractor is a full-stack web application designed to bridge the gap bet
 #### Backend Infrastructure
 - **Node.js**: Asynchronous, event-driven server runtime
 - **Express.js**: Minimalist web framework with middleware support
-- **FFmpeg Integration**: System-level audio processing for professional results
-- **Concurrent Processing**: Promise-based parallel task execution
+- **Python Integration**: Calls Faster-Whisper for local transcription
+- **File Management**: Audio download, processing, and result saving
 
 #### AI & ML Integration
 - **Faster-Whisper**: Local high-performance speech-to-text transcription (8.4x real-time speed)
-- **GPT-4**: Advanced language model for summarization and text optimization  
+- **GPT-4**: Advanced language model for podcast content summarization and text optimization  
 - **Local Processing**: Complete privacy with no audio data uploads
 - **Custom Prompting**: Specialized prompts for continuity and quality enhancement
 
@@ -119,7 +121,7 @@ podcast-to-text/
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone <https://github.com/wendy7756/podcast-to-text>
 cd podcast-to-text
 
 # Install Node.js dependencies

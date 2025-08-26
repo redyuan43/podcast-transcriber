@@ -581,10 +581,10 @@ Please output the optimized text directly in the original language without any e
 }
 
 /**
- * 生成音频内容总结
- * @param {string} transcript - 转录文本
+ * 生成播客内容总结
+ * @param {string} transcript - 播客转录文本
  * @param {string} outputLanguage - 输出语言
- * @returns {Promise<string>} - 总结文本
+ * @returns {Promise<string>} - 播客内容总结
  */
 async function generateSummary(transcript, outputLanguage = 'zh') {
     try {
@@ -599,29 +599,28 @@ async function generateSummary(transcript, outputLanguage = 'zh') {
         }
         
         const systemPrompt = outputLanguage === 'zh'
-            ? `你是一个专业的内容总结助手。请为以下音频转录内容生成一个全面、结构化的总结：
+            ? `你是一个专业的播客内容分析师。请为以下播客节目生成一个全面、结构化的总结：
 
 总结要求：
-1. 提取主要话题和关键信息
-2. 保持逻辑结构清晰
-3. 包含重要的观点、数据和结论
+1. 提取播客的主要话题和核心观点
+2. 保持逻辑结构清晰，突出播客的核心价值
+3. 包含重要的讨论内容、观点和结论
 4. 使用简洁明了的语言
-5. 适当保留说话者的表达风格
-6. 总结长度约为原文的20-30%
+5. 适当保留嘉宾/主持人的表达风格和重要观点
 
-请生成结构化的总结，包含要点和关键内容。`
 
-            : `You are a professional content summarization assistant. Please generate a comprehensive, structured summary for the following audio transcript:
+请生成结构化的播客内容总结，包含要点和关键内容。`
+
+            : `You are a professional podcast content analyst. Please generate a comprehensive, structured summary for the following podcast episode:
 
 Summary requirements:
-1. Extract main topics and key information
-2. Maintain clear logical structure
-3. Include important viewpoints, data, and conclusions
+1. Extract main topics and core viewpoints from the podcast
+2. Maintain clear logical structure highlighting the podcast's core value
+3. Include important discussions, viewpoints, and conclusions
 4. Use concise and clear language
-5. Appropriately retain the speaker's expression style
-6. Summary length should be about 20-30% of the original text
+5. Appropriately retain the hosts'/guests' expression style and important viewpoints
 
-Please generate a structured summary with key points and essential content.`;
+Please generate a structured podcast content summary with key points and essential content.`;
 
         const response = await openai.chat.completions.create({
             model: "gpt-4",

@@ -37,7 +37,7 @@ const translations = {
         langText: "中文"
     },
     en: {
-        title: "Podcast Extractor",
+        title: "Podcast Transcriber",
         subtitle: "Just provide a podcast audio link to get high-quality transcription and AI-powered summary",
         urlLabel: "Podcast Audio Link",
         urlHelper: "Supports Apple Podcasts, RSS feeds, Xiaoyuzhou, and direct audio links",
@@ -446,21 +446,25 @@ function showResultsContent(data, operation = 'transcribe_only') {
     }
     
     // 根据操作模式调整显示顺序
+    const downloadSection = document.getElementById('downloadSection');
+    
     if (operation === 'transcribe_summarize' && data.summary) {
-        // 转录+总结模式：总结在上，转录在下
-        summarySection.style.order = '1';
-        transcriptSection.style.order = '2';
+        // 转录+总结模式：下载 → 总结 → 转录
+        downloadSection.style.order = '1';
+        summarySection.style.order = '2';
+        transcriptSection.style.order = '3';
         const orderMsg = currentLang === 'zh' ? 
-            '📋 显示顺序：AI总结 → 转录文本' : 
-            '📋 Display order: AI Summary → Transcript';
+            '📋 显示顺序：下载 → AI总结 → 转录文本' : 
+            '📋 Display order: Download → AI Summary → Transcript';
         console.log(orderMsg);
     } else {
-        // 仅转录模式：转录在上
-        transcriptSection.style.order = '1';
-        summarySection.style.order = '2';
+        // 仅转录模式：下载 → 转录（AI总结区域隐藏，不参与排序）
+        downloadSection.style.order = '1';
+        transcriptSection.style.order = '2';
+        // summarySection 已被隐藏，不需要设置order
         const orderMsg = currentLang === 'zh' ? 
-            '📝 显示顺序：转录文本 → AI总结' : 
-            '📝 Display order: Transcript → AI Summary';
+            '📝 显示顺序：下载 → 转录文本' : 
+            '📝 Display order: Download → Transcript';
         console.log(orderMsg);
     }
     

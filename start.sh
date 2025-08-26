@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# 🎙️ Podcast提取器启动脚本 / Podcast Extractor Startup Script
+# 🎙️ Podcast提取器启动脚本 / Podcast Transcriber Startup Script
 
-echo "🎙️ 启动Podcast提取器... / Starting Podcast Extractor..."
+echo "🎙️ 启动Podcast提取器... / Starting Podcast Transcriber..."
 
 # 检查Node.js是否已安装
 if ! command -v node &> /dev/null; then
