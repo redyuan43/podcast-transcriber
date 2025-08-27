@@ -198,8 +198,38 @@ async function processPodcast(event) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15 * 60 * 1000); // 15分钟超时
         
-        // 启动进度模拟（暂无音频时长）
-        startProgressSimulation();
+        // 步骤1: 先获取音频时长估算
+        let estimatedDuration = null;
+        try {
+            console.log('🔍 正在预估音频时长...');
+            // 为预估接口使用独立的超时控制（30秒）
+            const estimateController = new AbortController();
+            const estimateTimeoutId = setTimeout(() => estimateController.abort(), 30000);
+            
+            const estimateResponse = await fetch('/api/estimate-duration', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ url: data.url }),
+                signal: estimateController.signal
+            });
+            
+            clearTimeout(estimateTimeoutId);
+            
+            if (estimateResponse.ok) {
+                const estimateResult = await estimateResponse.json();
+                if (estimateResult.success) {
+                    estimatedDuration = estimateResult.estimatedDuration;
+                    console.log(`📊 获取到音频时长估算: ${Math.round(estimatedDuration / 60)} 分钟`);
+                }
+            }
+        } catch (estimateError) {
+            console.warn('⚠️ 音频时长预估失败，使用默认估算:', estimateError.message);
+        }
+        
+        // 步骤2: 启动进度模拟（使用真实音频时长）
+        startProgressSimulation(estimatedDuration);
         
         const response = await fetch('/api/process-podcast', {
             method: 'POST',
@@ -272,7 +302,6 @@ async function checkForCompletedFiles() {
     try {
         // 显示检查状态
         showLoadingWithProgress();
-        updateProgressText('正在检查处理结果... / Checking processing results...', '验证文件完整性 / Verifying file integrity');
         
         // 获取temp目录中的文件列表
         const response = await fetch('/api/temp-files');
@@ -432,16 +461,9 @@ function startProgressSimulation(audioDuration = null) {
         console.log(`🎵 音频时长: ${audioMinutes.toFixed(1)}分钟`);
         console.log(`⏱️ 预估处理时间: ${estimatedTotalTime.toFixed(1)}分钟`);
     } else {
-        // 通用预估：基于操作类型的默认时间
-        if (savedRatio) {
-            // 基于历史比率的通用估算（假设中等长度音频30分钟）
-            estimatedTotalTime = 30 * parseFloat(savedRatio);
-            console.log(`📊 通用预估（基于历史）: ${estimatedTotalTime.toFixed(1)}分钟`);
-        } else {
-            // 没有足够信息时，不设置具体时间，继续显示范围
-            estimatedTotalTime = null;
-            console.log(`🔮 信息不足，显示预估范围`);
-        }
+        // 没有音频时长时，显示预估范围
+        estimatedTotalTime = null;
+        console.log(`🔮 未获取到音频时长，显示预估范围`);
     }
     
     progressInterval = setInterval(() => {
@@ -449,9 +471,9 @@ function startProgressSimulation(audioDuration = null) {
         
         // 模拟进度增长：按表格速度设置
         if (currentProgress < 30) {
-            currentProgress += Math.random() * 6 + 2; // 0-30%: 2-8%每秒
+            currentProgress += Math.random() * 6 + 3; // 0-30%: 3-9%每秒
         } else if (currentProgress < 60) {
-            currentProgress += Math.random() * 4 + 1; // 30-60%: 1-5%每秒
+            currentProgress += Math.random() * 4 + 2; // 30-60%: 2-6%每秒
         } else if (currentProgress < 80) {
             currentProgress += Math.random() * 2.5 + 0.5; // 60-80%: 0.5-3%每秒
         } else if (currentProgress < 90) {
@@ -483,9 +505,8 @@ function startProgressSimulation(audioDuration = null) {
                     // 基于音频时长的预估
                     remaining = Math.max(0.5, estimatedTotalTime * (100 - currentProgress) / 100);
                 } else {
-                    // 基于实际处理速度的动态预估（回退方案）
-                    const avgTimePerPercent = elapsed / currentProgress;
-                    remaining = Math.max(0.5, (100 - currentProgress) * avgTimePerPercent);
+                    // 没有音频时长时，显示合理的估算范围
+                    remaining = Math.max(1, Math.min(8, 8 - elapsed)); // 1-8分钟范围，随时间递减
                 }
                 
                 estimatedTime.textContent = `${translations[currentLang].remainingTime} ${Math.ceil(remaining)} ${translations[currentLang].minutes}...`;

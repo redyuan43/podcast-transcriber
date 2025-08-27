@@ -291,6 +291,47 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// 音频时长预估端点
+app.post('/api/estimate-duration', async (req, res) => {
+    try {
+        const { url } = req.body;
+        
+        if (!url) {
+            return res.status(400).json({
+                success: false,
+                error: '请提供音频链接'
+            });
+        }
+
+        console.log(`🔍 预估音频时长: ${url}`);
+        
+        // 步骤1: 下载音频文件
+        const originalAudioPath = await downloadPodcastAudio(url);
+        
+        // 步骤2: 基于文件大小估算时长
+        const estimatedDuration = await estimateAudioDuration(originalAudioPath);
+        console.log(`📊 预估时长: ${Math.round(estimatedDuration / 60)} 分钟 ${Math.round(estimatedDuration % 60)} 秒`);
+        
+        // 清理下载的文件
+        if (fs.existsSync(originalAudioPath)) {
+            fs.unlinkSync(originalAudioPath);
+            console.log(`🗑️ 已清理预估用的音频文件`);
+        }
+        
+        res.json({
+            success: true,
+            estimatedDuration: estimatedDuration // 返回秒数
+        });
+        
+    } catch (error) {
+        console.error('❌ 预估音频时长失败:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || '预估音频时长失败'
+        });
+    }
+});
+
 // 错误处理中间件
 app.use((error, req, res, next) => {
     console.error('未处理的错误:', error);
