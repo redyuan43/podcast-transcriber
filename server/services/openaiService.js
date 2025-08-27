@@ -29,13 +29,9 @@ function formatSummaryAsMarkdown(summary, audioFilePath) {
 - **总结引擎**: OpenAI GPT-4
 - **总结长度**: ${summary.length} 字符
 
----
-
 ## 📋 内容总结
 
 ${summary}
-
----
 
 *本文档由 [Podcast提取器](https://github.com/wendy7756/podcast-transcriber) 自动生成*
 `;

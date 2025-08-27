@@ -66,22 +66,22 @@
             border-bottom: none !important;
         }
         .prose p {
-            margin-bottom: 0.5rem !important;
+            margin-bottom: 0.3rem !important;
         }
         .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
-            margin-top: 0.75rem !important;
-            margin-bottom: 0.5rem !important;
+            margin-top: 0.3rem !important;
+            margin-bottom: 0.3rem !important;
             border: none !important;
         }
         .prose ul, .prose ol {
-            margin-bottom: 0.5rem !important;
+            margin-bottom: 0.3rem !important;
         }
         .prose li {
-            margin-bottom: 0.25rem !important;
+            margin-bottom: 0.15rem !important;
         }
         .prose blockquote {
-            margin-top: 0.5rem !important;
-            margin-bottom: 0.5rem !important;
+            margin-top: 0.3rem !important;
+            margin-bottom: 0.3rem !important;
             border-left: 4px solid #e2e8f0 !important;
             border-top: none !important;
             border-bottom: none !important;
@@ -95,7 +95,89 @@
             font-weight: inherit !important;
             line-height: inherit !important;
             margin-top: 0 !important;
-            margin-bottom: 0.5rem !important;
+            margin-bottom: 0.3rem !important;
+        }
+        
+        /* Summary区域：与Transcript完全一致的强力重置 */
+        #summaryText.prose *,
+        #summaryText.prose *:before,
+        #summaryText.prose *:after {
+            margin-top: 0 !important;
+            margin-bottom: 0.3rem !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        
+        /* 特殊处理列表项，使用更小间距 */
+        #summaryText.prose li {
+            margin-bottom: 0.15rem !important;
+        }
+        
+        /* 确保分割线样式 */
+        #summaryText.prose hr {
+            margin: 0.3rem 0 !important;
+            height: 1px !important;
+            background-color: #e2e8f0 !important;
+            border: none !important;
+        }
+        
+        /* 重置所有可能的块级元素 */
+        #summaryText.prose p,
+        #summaryText.prose div,
+        #summaryText.prose h1,
+        #summaryText.prose h2,
+        #summaryText.prose h3,
+        #summaryText.prose h4,
+        #summaryText.prose h5,
+        #summaryText.prose h6,
+        #summaryText.prose ul,
+        #summaryText.prose ol,
+        #summaryText.prose blockquote,
+        #summaryText.prose pre,
+        #summaryText.prose table {
+            margin-top: 0 !important;
+            margin-bottom: 0.3rem !important;
+        }
+        
+        /* Transcript区域：强制统一所有元素间距 */
+        #transcriptText.prose *,
+        #transcriptText.prose *:before,
+        #transcriptText.prose *:after {
+            margin-top: 0 !important;
+            margin-bottom: 0.3rem !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        
+        /* 特殊处理列表项，使用更小间距 */
+        #transcriptText.prose li {
+            margin-bottom: 0.15rem !important;
+        }
+        
+        /* 确保分割线样式 */
+        #transcriptText.prose hr {
+            margin: 0.3rem 0 !important;
+            height: 1px !important;
+            background-color: #e2e8f0 !important;
+            border: none !important;
+        }
+        
+        /* 重置所有可能的块级元素 */
+        #transcriptText.prose p,
+        #transcriptText.prose div,
+        #transcriptText.prose h1,
+        #transcriptText.prose h2,
+        #transcriptText.prose h3,
+        #transcriptText.prose h4,
+        #transcriptText.prose h5,
+        #transcriptText.prose h6,
+        #transcriptText.prose ul,
+        #transcriptText.prose ol,
+        #transcriptText.prose blockquote,
+        #transcriptText.prose pre,
+        #transcriptText.prose table {
+            margin-top: 0 !important;
+            margin-bottom: 0.3rem !important;
         }
 
     </style>
