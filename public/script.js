@@ -21,7 +21,7 @@ const translations = {
         summaryTitle: "AI总结",
         loadingText: "正在处理您的播客...",
         errorText: "处理过程中出现错误",
-        estimatedTime: "预计需要 10-15 分钟...",
+        estimatedTime: "预计需要 3-8 分钟...",
         processingTips: "处理中，请耐心等待：",
         tipKeepOpen: "页面请保持打开状态",
         tipLargeFile: "大文件需要更长时间处理",
@@ -57,7 +57,7 @@ const translations = {
         summaryTitle: "AI Summary",
         loadingText: "Processing your podcast...",
         errorText: "An error occurred during processing",
-        estimatedTime: "Estimated 10-15 minutes...",
+        estimatedTime: "Estimated 3-8 minutes...",
         processingTips: "Processing, please wait patiently:",
         tipKeepOpen: "Keep this page open",
         tipLargeFile: "Large files require more processing time",
@@ -198,7 +198,7 @@ async function processPodcast(event) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15 * 60 * 1000); // 15分钟超时
         
-        // 启动进度模拟
+        // 启动进度模拟（暂无音频时长）
         startProgressSimulation();
         
         const response = await fetch('/api/process-podcast', {
@@ -222,6 +222,32 @@ async function processPodcast(event) {
         stopProgressSimulation();
         
         if (result.success) {
+            // 处理时长信息（支持估算时长和真实时长）
+            const processingMinutes = (Date.now() - startTime) / 1000 / 60;
+            
+            if (result.data.actualDuration) {
+                // 有真实时长，更新学习数据
+                const audioMinutes = result.data.actualDuration / 60;
+                const actualRatio = processingMinutes / audioMinutes;
+                
+                console.log(`✅ 真实音频时长: ${audioMinutes.toFixed(1)} 分钟`);
+                console.log(`⏱️ 实际处理时间: ${processingMinutes.toFixed(1)} 分钟`);
+                console.log(`📊 实际处理比率: ${actualRatio.toFixed(2)}x`);
+                
+                // 保存处理比率，用于改进未来预估
+                localStorage.setItem('audioProcessingRatio', actualRatio.toString());
+                
+                // 显示时长对比信息
+                if (result.data.estimatedDuration) {
+                    const estimatedMinutes = result.data.estimatedDuration / 60;
+                    console.log(`📏 初始估算: ${estimatedMinutes.toFixed(1)} 分钟 | 真实时长: ${audioMinutes.toFixed(1)} 分钟`);
+                }
+            } else if (result.data.estimatedDuration) {
+                // 只有估算时长
+                const estimatedMinutes = result.data.estimatedDuration / 60;
+                console.log(`📊 基于文件大小估算: ${estimatedMinutes.toFixed(1)} 分钟`);
+            }
+            
             showResultsContent(result.data, data.operation);
         } else {
             showError(result.error || 'Unknown error occurred');
@@ -374,24 +400,64 @@ function showLoadingWithProgress() {
 // 进度模拟变量
 let progressInterval = null;
 let currentProgress = 0;
+let startTime = null;
+let estimatedTotalTime = null; // 基于音频时长的预估总时间
 
 // 启动进度模拟
-function startProgressSimulation() {
+function startProgressSimulation(audioDuration = null) {
     currentProgress = 0;
+    startTime = Date.now(); // 记录开始时间
     const progressBar = document.getElementById('progressBar');
     const progressText = document.getElementById('progressText');
     const estimatedTime = document.getElementById('estimatedTime');
+
+    // 使用通用时间预估（不需要预先知道音频时长）
+    const operation = document.querySelector('input[name="operation"]:checked')?.value;
+    const savedRatio = localStorage.getItem('audioProcessingRatio');
+    
+    if (audioDuration) {
+        // 如果提供了音频时长（真实或估算），使用它
+        const audioMinutes = audioDuration / 60;
+        
+        let multiplier;
+        if (savedRatio) {
+            multiplier = parseFloat(savedRatio);
+            console.log(`📊 使用历史数据，处理比率: ${multiplier.toFixed(2)}x`);
+        } else {
+            multiplier = operation === 'transcribe_summarize' ? 0.6 : 0.4;
+            console.log(`🔮 使用经验公式，处理比率: ${multiplier.toFixed(2)}x`);
+        }
+        
+        estimatedTotalTime = audioMinutes * multiplier;
+        console.log(`🎵 音频时长: ${audioMinutes.toFixed(1)}分钟`);
+        console.log(`⏱️ 预估处理时间: ${estimatedTotalTime.toFixed(1)}分钟`);
+    } else {
+        // 通用预估：基于操作类型的默认时间
+        if (savedRatio) {
+            // 基于历史比率的通用估算（假设中等长度音频30分钟）
+            estimatedTotalTime = 30 * parseFloat(savedRatio);
+            console.log(`📊 通用预估（基于历史）: ${estimatedTotalTime.toFixed(1)}分钟`);
+        } else {
+            // 没有足够信息时，不设置具体时间，继续显示范围
+            estimatedTotalTime = null;
+            console.log(`🔮 信息不足，显示预估范围`);
+        }
+    }
     
     progressInterval = setInterval(() => {
-        // 模拟进度增长：前期快速增长，后期缓慢
-        if (currentProgress < 20) {
-            currentProgress += Math.random() * 3; // 0-20%: 快速
+        const elapsed = (Date.now() - startTime) / 1000 / 60; // 已用时间（分钟）
+        
+        // 模拟进度增长：按表格速度设置
+        if (currentProgress < 30) {
+            currentProgress += Math.random() * 6 + 2; // 0-30%: 2-8%每秒
         } else if (currentProgress < 60) {
-            currentProgress += Math.random() * 1.5; // 20-60%: 中等
-        } else if (currentProgress < 85) {
-            currentProgress += Math.random() * 0.8; // 60-85%: 缓慢
+            currentProgress += Math.random() * 4 + 1; // 30-60%: 1-5%每秒
+        } else if (currentProgress < 80) {
+            currentProgress += Math.random() * 2.5 + 0.5; // 60-80%: 0.5-3%每秒
+        } else if (currentProgress < 90) {
+            currentProgress += Math.random() * 1.5 + 0.3; // 80-90%: 0.3-1.8%每秒
         } else if (currentProgress < 95) {
-            currentProgress += Math.random() * 0.3; // 85-95%: 很缓慢
+            currentProgress += Math.random() * 0.8 + 0.1; // 90-95%: 0.1-0.9%每秒，显示almost done
         }
         
         // 确保不超过95%（留最后5%给实际完成）
@@ -407,13 +473,38 @@ function startProgressSimulation() {
             progressText.textContent = `${Math.floor(currentProgress)}%`;
         }
         
-        // 更新预计时间
-        if (estimatedTime) {
-            const remaining = Math.max(1, Math.floor((100 - currentProgress) * 0.15)); // 假设每1%需要0.15分钟
-            if (remaining > 1) {
-                estimatedTime.textContent = `${translations[currentLang].remainingTime} ${remaining} ${translations[currentLang].minutes}...`;
+        // 智能预计时间：5%-90%显示剩余时间，90%-99%显示almost done
+        if (estimatedTime && currentProgress > 5) {
+            if (currentProgress < 90) {
+                // 主要处理阶段：显示剩余时间估算
+                let remaining;
+                
+                if (estimatedTotalTime) {
+                    // 基于音频时长的预估
+                    remaining = Math.max(0.5, estimatedTotalTime * (100 - currentProgress) / 100);
+                } else {
+                    // 基于实际处理速度的动态预估（回退方案）
+                    const avgTimePerPercent = elapsed / currentProgress;
+                    remaining = Math.max(0.5, (100 - currentProgress) * avgTimePerPercent);
+                }
+                
+                estimatedTime.textContent = `${translations[currentLang].remainingTime} ${Math.ceil(remaining)} ${translations[currentLang].minutes}...`;
             } else {
+                // 最终阶段（90%-99%）：显示"即将完成"
                 estimatedTime.textContent = translations[currentLang].almostDone;
+            }
+        } else if (estimatedTime) {
+            // 前5%显示初始估算
+            if (estimatedTotalTime) {
+                const minutes = Math.ceil(estimatedTotalTime);
+                // 使用多语言模板
+                if (currentLang === 'zh') {
+                    estimatedTime.textContent = `预计需要 ${minutes} 分钟...`;
+                } else {
+                    estimatedTime.textContent = `Estimated ${minutes} minutes...`;
+                }
+            } else {
+                estimatedTime.textContent = translations[currentLang].estimatedTime;
             }
         }
     }, 1000); // 每秒更新一次

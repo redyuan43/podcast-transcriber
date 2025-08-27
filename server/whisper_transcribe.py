@@ -131,25 +131,12 @@ def format_transcript_as_markdown(transcript_text, original_filename=None):
     if original_filename:
         audio_name = Path(original_filename).stem
     
-    # 构建Markdown内容
-    markdown_content = f"""# 🎙️ Podcast转录
-
-## 📊 基本信息
-
-- **文件名称**: {audio_name}
-- **转录时间**: {current_time}
-- **转录引擎**: Faster-Whisper (local)
-- **文本长度**: {len(transcript_text)} 字符
-
----
-
-## 📝 转录内容
+    # 构建Markdown内容 - 简洁版本
+    title = f"# 🎙️ {audio_name}" if audio_name != "未知" else "# 🎙️ Podcast转录"
+    
+    markdown_content = f"""{title}
 
 {transcript_text}
-
----
-
-*本文档由 [Podcast提取器](https://github.com/wendy7756/podcast-transcriber) 自动生成*
 """
     
     return markdown_content

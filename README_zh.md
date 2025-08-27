@@ -87,7 +87,7 @@ podcast-to-text/
 │   ├── 📂 services/                    # 核心业务逻辑
 │   │   ├── 📄 openaiService.js         # AI处理和优化
 │   │   ├── 📄 podcastService.js        # 播客提取和解析
-│   │   ├── 📄 audioCompressionService.js # 音频处理管理
+│   │   ├── 📄 audioInfoService.js        # 音频信息获取
 │   │   └── 📄 rssParser.js             # RSS订阅源处理
 │   └── 📂 temp/                        # 临时音频和文本存储（自动创建）
 │

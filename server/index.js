@@ -7,7 +7,7 @@ require('dotenv').config();
 
 const { processAudioWithOpenAI } = require('./services/openaiService');
 const { downloadPodcastAudio } = require('./services/podcastService');
-const { smartCompress } = require('./services/audioCompressionService');
+const { getAudioFiles, estimateAudioDuration } = require('./services/audioInfoService');
 
 const app = express();
 const DEFAULT_PORT = Number(process.env.PORT) || 3000;
@@ -72,14 +72,19 @@ app.post('/api/process-podcast', async (req, res) => {
             });
         }
 
-        // 步骤2: 智能音频处理（检查大小，必要时分割）
-        console.log('🔍 检查音频文件大小并智能处理...');
-        const audioFiles = await smartCompress(originalAudioPath);
+        // 步骤2: 基于文件大小估算时长（用于初始预估）
+        console.log('📊 估算音频时长...');
+        const estimatedDuration = await estimateAudioDuration(originalAudioPath);
+        console.log(`🎯 预估时长: ${Math.round(estimatedDuration / 60)} 分钟 ${Math.round(estimatedDuration % 60)} 秒`);
+
+        // 步骤3: 获取音频文件信息
+        console.log('🔍 获取音频文件信息...');
+        const audioFiles = await getAudioFiles(originalAudioPath);
         
         const shouldSummarize = operation === 'transcribe_summarize';
         console.log(`📋 处理模式: ${shouldSummarize ? '转录+总结' : '仅转录'}`);
         
-        // 步骤3: 使用本地Whisper处理音频
+        // 步骤4: 使用本地Whisper处理音频
         console.log(`🤖 本地转录处理 ${audioFiles.length} 个音频文件...`);
         const result = await processAudioWithOpenAI(audioFiles, shouldSummarize, outputLanguage, tempDir, audioLanguage);
 
@@ -114,11 +119,13 @@ app.post('/api/process-podcast', async (req, res) => {
             console.warn('⚠️ 清理临时文件失败:', cleanupError);
         }
 
-        // 返回结果（包含文件下载信息）
+        // 返回结果（包含估算和真实时长）
         res.json({
             success: true,
             data: {
                 ...result,
+                estimatedDuration: estimatedDuration, // 估算时长（秒）
+                actualDuration: result.audioDuration || result.duration, // 从Whisper获取的真实时长
                 savedFiles: savedFiles
             }
         });

@@ -7,33 +7,28 @@ const { promisify } = require('util');
 const execAsync = promisify(exec);
 
 /**
- * 将总结格式化为Markdown
+ * 将总结格式化为Markdown - 简洁版本
  */
-function formatSummaryAsMarkdown(summary, audioFilePath) {
-    const audioName = audioFilePath ? path.basename(audioFilePath, path.extname(audioFilePath)) : '未知';
-    const currentTime = new Date().toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit', 
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-    });
+function formatSummaryAsMarkdown(summary, audioFilePath, outputLanguage = 'zh') {
+    const audioName = audioFilePath ? path.basename(audioFilePath, path.extname(audioFilePath)) : '';
     
-    return `# 🤖 AI总结
-
-## 📊 基本信息
-
-- **文件名称**: ${audioName}
-- **生成时间**: ${currentTime}
-- **总结引擎**: OpenAI GPT-4
-- **总结长度**: ${summary.length} 字符
-
-## 📋 内容总结
+    // 多语言标题
+    const titles = {
+        zh: '# 🎙️ Podcast总结',
+        en: '# 🎙️ Podcast Summary',
+        es: '# 🎙️ Resumen del Podcast',
+        fr: '# 🎙️ Résumé du Podcast',
+        de: '# 🎙️ Podcast-Zusammenfassung'
+    };
+    
+    const title = titles[outputLanguage] || titles.en;
+    
+    // 如果有音频名称，使用具体名称；否则用通用标题
+    const finalTitle = audioName ? `# 🎙️ ${audioName}` : title;
+    
+    return `${finalTitle}
 
 ${summary}
-
-*本文档由 [Podcast提取器](https://github.com/wendy7756/podcast-transcriber) 自动生成*
 `;
 }
 
@@ -163,7 +158,7 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
                 // 保存AI总结（Markdown格式）
                 const summaryFileName = `${filePrefix}_summary.md`;
                 const summaryPath = path.join(tempDir, summaryFileName);
-                const markdownSummary = formatSummaryAsMarkdown(summary, files[0]);
+                const markdownSummary = formatSummaryAsMarkdown(summary, files[0], outputLanguage);
                 fs.writeFileSync(summaryPath, markdownSummary, 'utf8');
                 
                 savedFiles.push({
@@ -183,6 +178,7 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
                 transcript: transcript,
                 summary: result.summary || null, // 如果有总结则包含
                 language: outputLanguage,
+                audioDuration: result.audioDuration, // 从Whisper获取的真实音频时长
                 savedFiles: savedFiles
             };
             
@@ -406,7 +402,13 @@ async function transcribeAudioLocal(audioPath, language = null, shouldSaveDirect
                 text: transcript,
                 savedFiles: result.savedFiles,
                 language: result.language,
-                processing_time: result.processing_time
+                processing_time: result.processing_time,
+                audioDuration: result.duration, // 从Whisper获取的真实音频时长
+                whisperInfo: {
+                    duration: result.duration,
+                    language: result.language,
+                    language_probability: result.language_probability
+                }
             };
         }
         
@@ -809,8 +811,8 @@ async function generateSmartChunkedSummary(transcript, outputLanguage) {
             }
         }
         
-        // 合并所有分块总结
-        const combinedSummary = chunkSummaries.join('\n\n---\n\n');
+        // 合并所有分块总结（使用空行分隔，不用分割线）
+        const combinedSummary = chunkSummaries.join('\n\n');
         
         // 最终整合成完整总结
         const finalSummary = await generateFinalSummary(combinedSummary, outputLanguage);

@@ -90,7 +90,7 @@ podcast-to-text/
 │   ├── 📂 services/                    # Core business logic
 │   │   ├── 📄 openaiService.js         # AI processing & optimization
 │   │   ├── 📄 podcastService.js        # Podcast extraction & parsing
-│   │   ├── 📄 audioCompressionService.js # Audio processing management
+│   │   ├── 📄 audioInfoService.js        # Audio information retrieval
 │   │   └── 📄 rssParser.js             # RSS feed processing
 │   └── 📂 temp/                        # Temporary audio & text storage (auto-created)
 │
