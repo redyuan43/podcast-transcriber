@@ -1,6 +1,6 @@
 <div align="center">
   
-# 🎙️ Podcast Transcriber
+# 🎙️ AI Podcast Transcriber
 
 English | [中文](README_zh.md)
 

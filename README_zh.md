@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎙️ 播客提取器
+# 🎙️ AI播客提取器
 
 **中文 | [English](README.md)**
 
