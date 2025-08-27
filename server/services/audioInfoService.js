@@ -1,4 +1,5 @@
 const fs = require('fs').promises;
+const { formatSizeMB, estimateAudioDurationFromSize } = require('../utils/formatUtils');
 
 /**
  * 音频信息服务 - 无外部依赖版本
@@ -13,8 +14,7 @@ const fs = require('fs').promises;
 async function getAudioFiles(inputPath) {
     try {
         const stats = await fs.stat(inputPath);
-        const sizeMB = stats.size / (1024 * 1024);
-        console.log(`🎵 音频文件大小: ${sizeMB.toFixed(2)}MB`);
+        console.log(`🎵 音频文件大小: ${formatSizeMB(stats.size)}`);
         return [inputPath];
     } catch (error) {
         console.error('❌ 获取音频文件信息失败:', error);
@@ -30,10 +30,8 @@ async function getAudioFiles(inputPath) {
 async function estimateAudioDuration(filePath) {
     try {
         const stats = await fs.stat(filePath);
-        const sizeMB = stats.size / (1024 * 1024);
-        // 经验公式：128kbps MP3约1MB/分钟，保守估算
-        const estimatedMinutes = sizeMB * 0.8; // 稍微保守的估算
-        const estimatedSeconds = estimatedMinutes * 60;
+        const estimatedSeconds = estimateAudioDurationFromSize(stats.size);
+        const estimatedMinutes = estimatedSeconds / 60;
         console.log(`📊 基于文件大小估算时长: ${estimatedMinutes.toFixed(1)}分钟`);
         return estimatedSeconds;
     } catch (error) {

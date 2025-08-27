@@ -3,11 +3,14 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
 require('dotenv').config();
 
 const { processAudioWithOpenAI } = require('./services/openaiService');
 const { downloadPodcastAudio } = require('./services/podcastService');
 const { getAudioFiles, estimateAudioDuration } = require('./services/audioInfoService');
+const { cleanupAudioFiles } = require('./utils/fileSaver');
+const { formatSizeKB, formatSizeMB, estimateAudioDurationFromSize } = require('./utils/formatUtils');
 
 const app = express();
 const DEFAULT_PORT = Number(process.env.PORT) || 3000;
@@ -94,30 +97,11 @@ app.post('/api/process-podcast', async (req, res) => {
         
         // 打印保存的文件详情
         savedFiles.forEach(file => {
-            console.log(`📁 ${file.type}: ${file.filename} (${(file.size/1024).toFixed(1)}KB)`);
+            console.log(`📁 ${file.type}: ${file.filename} (${formatSizeKB(file.size)})`);
         });
 
         // 步骤5: 清理音频临时文件
-        try {
-            // 清理原始下载文件
-            if (fs.existsSync(originalAudioPath)) {
-                fs.unlinkSync(originalAudioPath);
-                console.log(`🗑️ 已清理原始文件: ${path.basename(originalAudioPath)}`);
-            }
-            
-            // 如果有分割文件，清理分割文件（但保留原文件如果它就是唯一文件）
-            if (audioFiles.length > 1) {
-                console.log(`🧹 清理 ${audioFiles.length} 个分割文件...`);
-                for (const file of audioFiles) {
-                    if (fs.existsSync(file)) {
-                        fs.unlinkSync(file);
-                        console.log(`   ✅ 已删除: ${path.basename(file)}`);
-                    }
-                }
-            }
-        } catch (cleanupError) {
-            console.warn('⚠️ 清理临时文件失败:', cleanupError);
-        }
+        cleanupAudioFiles(originalAudioPath, audioFiles);
 
         // 返回结果（包含估算和真实时长）
         res.json({
@@ -185,7 +169,7 @@ app.post('/api/process-local-file', async (req, res) => {
         
         // 打印保存的文件详情
         savedFiles.forEach(file => {
-            console.log(`📁 ${file.type}: ${file.filename} (${(file.size/1024).toFixed(1)}KB)`);
+            console.log(`📁 ${file.type}: ${file.filename} (${formatSizeKB(file.size)})`);
         });
         
         // 返回结果
@@ -291,7 +275,7 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// 音频时长预估端点
+// 音频时长预估端点 - 轻量级，只获取文件大小
 app.post('/api/estimate-duration', async (req, res) => {
     try {
         const { url } = req.body;
@@ -303,31 +287,40 @@ app.post('/api/estimate-duration', async (req, res) => {
             });
         }
 
-        console.log(`🔍 预估音频时长: ${url}`);
+        console.log(`🔍 轻量级预估音频时长: ${url}`);
         
-        // 步骤1: 下载音频文件
-        const originalAudioPath = await downloadPodcastAudio(url);
-        
-        // 步骤2: 基于文件大小估算时长
-        const estimatedDuration = await estimateAudioDuration(originalAudioPath);
-        console.log(`📊 预估时长: ${Math.round(estimatedDuration / 60)} 分钟 ${Math.round(estimatedDuration % 60)} 秒`);
-        
-        // 清理下载的文件
-        if (fs.existsSync(originalAudioPath)) {
-            fs.unlinkSync(originalAudioPath);
-            console.log(`🗑️ 已清理预估用的音频文件`);
-        }
-        
-        res.json({
-            success: true,
-            estimatedDuration: estimatedDuration // 返回秒数
+        // 使用 HEAD 请求获取文件大小，不下载完整文件
+        const headResponse = await axios.head(url, {
+            timeout: 10000, // 10秒超时
+            maxRedirects: 5
         });
+        
+        const contentLength = parseInt(headResponse.headers['content-length'] || '0');
+        if (contentLength > 0) {
+            // 基于文件大小估算时长（使用统一工具函数）
+            const estimatedDuration = estimateAudioDurationFromSize(contentLength);
+            
+            console.log(`📊 文件大小: ${formatSizeMB(contentLength)}，预估时长: ${Math.round(estimatedDuration / 60)} 分钟`);
+            
+            res.json({
+                success: true,
+                estimatedDuration: estimatedDuration // 返回秒数
+            });
+        } else {
+            // 无法获取文件大小，返回默认估算
+            console.log(`⚠️ 无法获取文件大小，使用默认估算`);
+            res.json({
+                success: true,
+                estimatedDuration: 600 // 默认10分钟
+            });
+        }
         
     } catch (error) {
         console.error('❌ 预估音频时长失败:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message || '预估音频时长失败'
+        // 失败时返回默认估算，不阻塞主流程
+        res.json({
+            success: true,
+            estimatedDuration: 600 // 默认10分钟
         });
     }
 });

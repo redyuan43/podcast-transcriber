@@ -198,13 +198,40 @@ async function processPodcast(event) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15 * 60 * 1000); // 15分钟超时
         
-        // 步骤1: 先获取音频时长估算
+        // 步骤1: 先获取音频时长估算，带进度反馈
         let estimatedDuration = null;
+        
+        // 显示预估阶段的进度
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const estimatedTime = document.getElementById('estimatedTime');
+        
+        // 预估开始：进度到2%
+        if (progressBar) {
+            progressBar.style.width = '2%';
+            progressBar.setAttribute('aria-valuenow', '2');
+        }
+        if (progressText) {
+            progressText.textContent = '2%';
+        }
+        if (estimatedTime) {
+            estimatedTime.textContent = currentLang === 'zh' ? '正在分析音频...' : 'Analyzing audio...';
+        }
+        
         try {
             console.log('🔍 正在预估音频时长...');
             // 为预估接口使用独立的超时控制（30秒）
             const estimateController = new AbortController();
             const estimateTimeoutId = setTimeout(() => estimateController.abort(), 30000);
+            
+            // 预估中：进度到5%
+            if (progressBar) {
+                progressBar.style.width = '5%';
+                progressBar.setAttribute('aria-valuenow', '5');
+            }
+            if (progressText) {
+                progressText.textContent = '5%';
+            }
             
             const estimateResponse = await fetch('/api/estimate-duration', {
                 method: 'POST',
@@ -222,10 +249,30 @@ async function processPodcast(event) {
                 if (estimateResult.success) {
                     estimatedDuration = estimateResult.estimatedDuration;
                     console.log(`📊 获取到音频时长估算: ${Math.round(estimatedDuration / 60)} 分钟`);
+                    
+                    // 预估完成：进度到8%
+                    if (progressBar) {
+                        progressBar.style.width = '8%';
+                        progressBar.setAttribute('aria-valuenow', '8');
+                    }
+                    if (progressText) {
+                        progressText.textContent = '8%';
+                    }
+                    if (estimatedTime) {
+                        estimatedTime.textContent = currentLang === 'zh' ? '开始处理...' : 'Starting processing...';
+                    }
                 }
             }
         } catch (estimateError) {
             console.warn('⚠️ 音频时长预估失败，使用默认估算:', estimateError.message);
+            // 预估失败也要显示进度
+            if (progressBar) {
+                progressBar.style.width = '5%';
+                progressBar.setAttribute('aria-valuenow', '5');
+            }
+            if (progressText) {
+                progressText.textContent = '5%';
+            }
         }
         
         // 步骤2: 启动进度模拟（使用真实音频时长）
@@ -434,9 +481,17 @@ let estimatedTotalTime = null; // 基于音频时长的预估总时间
 
 // 启动进度模拟
 function startProgressSimulation(audioDuration = null) {
-    currentProgress = 0;
-    startTime = Date.now(); // 记录开始时间
+    // 获取当前进度，避免重置预估阶段的进度
     const progressBar = document.getElementById('progressBar');
+    if (progressBar) {
+        const currentValue = parseInt(progressBar.getAttribute('aria-valuenow') || '0');
+        currentProgress = Math.max(currentProgress, currentValue); // 保持已有进度
+    }
+    if (currentProgress === 0) {
+        currentProgress = 0; // 如果没有预估阶段，从0开始
+    }
+    
+    startTime = Date.now(); // 记录开始时间
     const progressText = document.getElementById('progressText');
     const estimatedTime = document.getElementById('estimatedTime');
 
@@ -469,7 +524,7 @@ function startProgressSimulation(audioDuration = null) {
     progressInterval = setInterval(() => {
         const elapsed = (Date.now() - startTime) / 1000 / 60; // 已用时间（分钟）
         
-        // 模拟进度增长：按表格速度设置
+        // 模拟进度增长：按表格速度设置，从当前进度开始
         if (currentProgress < 30) {
             currentProgress += Math.random() * 6 + 3; // 0-30%: 3-9%每秒
         } else if (currentProgress < 60) {
@@ -495,8 +550,8 @@ function startProgressSimulation(audioDuration = null) {
             progressText.textContent = `${Math.floor(currentProgress)}%`;
         }
         
-        // 智能预计时间：5%-90%显示剩余时间，90%-99%显示almost done
-        if (estimatedTime && currentProgress > 5) {
+        // 智能预计时间：8%-90%显示剩余时间，90%-99%显示almost done
+        if (estimatedTime && currentProgress > 8) {
             if (currentProgress < 90) {
                 // 主要处理阶段：显示剩余时间估算
                 let remaining;
@@ -515,7 +570,7 @@ function startProgressSimulation(audioDuration = null) {
                 estimatedTime.textContent = translations[currentLang].almostDone;
             }
         } else if (estimatedTime) {
-            // 前5%显示初始估算
+            // 前8%显示初始估算
             if (estimatedTotalTime) {
                 const minutes = Math.ceil(estimatedTotalTime);
                 // 使用多语言模板
