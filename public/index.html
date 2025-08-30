@@ -51,8 +51,8 @@
             }
         }
         
-        /* 进度条平滑过渡 */
-        #progressBar {
+        /* 智能进度条平滑过渡 */
+        #progressFill {
             transition: width 0.5s ease-out;
         }
         
@@ -121,6 +121,39 @@
             border: none !important;
         }
         
+        /* Tab 样式 */
+        .tab-button {
+            padding: 12px 24px;
+            border-bottom: 2px solid transparent;
+            font-weight: 500;
+            color: #64748b;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .tab-button:hover {
+            color: #334155;
+            border-bottom-color: #cbd5e1;
+        }
+        
+        .tab-button.active {
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+            background: linear-gradient(to bottom, rgba(59, 130, 246, 0.05), transparent);
+        }
+        
+        .tab-content {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         /* 重置所有可能的块级元素 */
         #summaryText.prose p,
         #summaryText.prose div,
@@ -315,13 +348,19 @@
                     <div class="loading text-6xl mb-4">🎧</div>
                     <p class="text-lg text-slate-600 mb-2" id="loadingText">正在处理您的播客...</p>
                     
-                    <!-- 详细进度显示 -->
-                    <div class="max-w-md mx-auto mt-6">
-                        <!-- 进度条容器 -->
-                        <div class="bg-slate-200 rounded-full h-4 relative overflow-hidden shadow-inner">
+                    <!-- 智能进度显示系统 -->
+                    <div class="progress-section max-w-md mx-auto mt-6" id="progressSection">
+                        <!-- 进度头部 -->
+                        <div class="progress-header flex justify-between items-center mb-3">
+                            <h3 class="text-sm font-medium text-slate-700" id="progressTitle">Processing Progress</h3>
+                            <span class="progress-status text-sm font-semibold text-blue-600" id="progressStatus">0%</span>
+                        </div>
+                        
+                        <!-- 进度条 -->
+                        <div class="progress-bar bg-slate-200 rounded-full h-4 relative overflow-hidden shadow-inner">
                             <div 
-                                id="progressBar"
-                                class="bg-gradient-to-r from-blue-500 to-cyan-500 h-4 rounded-full transition-all duration-300 ease-out shadow-sm"
+                                id="progressFill"
+                                class="bg-gradient-to-r from-blue-500 to-cyan-500 h-4 rounded-full transition-all duration-500 ease-out shadow-sm"
                                 style="width: 0%"
                                 role="progressbar"
                                 aria-valuenow="0"
@@ -332,26 +371,9 @@
                             <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-20 loading-shine"></div>
                         </div>
                         
-                        <!-- 进度文本 -->
-                        <div class="flex justify-between items-center mt-3 text-sm text-slate-600">
-                            <span id="progressText" class="font-semibold text-blue-600">0%</span>
-                            <span id="estimatedTime" class="text-slate-500">预计需要 3-8 分钟...</span>
-                        </div>
-                        
-                        <!-- 处理步骤提示 -->
-                        <div class="mt-4 text-xs text-slate-500 space-y-1">
-                            <div class="flex items-center justify-center space-x-2">
-                                <div class="w-2 h-2 rounded-full bg-green-400"></div>
-                                <span id="stepDownloadText">下载音频文件</span>
-                            </div>
-                            <div class="flex items-center justify-center space-x-2">
-                                <div class="w-2 h-2 rounded-full bg-blue-400 loading-pulse"></div>
-                                <span id="stepTranscribeText">AI语音转录中...</span>
-                            </div>
-                            <div class="flex items-center justify-center space-x-2">
-                                <div class="w-2 h-2 rounded-full bg-slate-300"></div>
-                                <span id="stepSummarizeText">生成智能总结</span>
-                            </div>
+                        <!-- 进度消息 -->
+                        <div class="progress-message mt-3 text-center">
+                            <span id="progressMessage" class="text-sm text-slate-600">Preparing...</span>
                         </div>
                     </div>
                     
@@ -376,42 +398,40 @@
                 </div>
 
                 <!-- Results Content -->
-                <div id="resultsContent" class="hidden flex flex-col">
-                    <!-- Transcript Section -->
-                    <div id="transcriptSection" class="mb-6">
-                        <h3 class="text-xl font-semibold text-slate-800 mb-3 flex items-center">
-                            <span class="text-xl mr-2">📝</span>
-                            <span id="transcriptTitle">转录文本</span>
-                        </h3>
-                        <div class="bg-slate-50 rounded-xl p-6 border border-slate-200">
-                            <div id="transcriptText" class="prose prose-slate max-w-none text-base leading-relaxed whitespace-pre-line"></div>
-                        </div>
+                <div id="resultsContent" class="hidden">
+                    <!-- Tab Navigation -->
+                    <div class="border-b border-slate-200 mb-6">
+                        <nav class="flex space-x-8" id="tabNavigation">
+                            <!-- Tabs will be dynamically added by JavaScript -->
+                        </nav>
                     </div>
 
-                    <!-- Summary Section -->
-                    <div id="summarySection" class="hidden mb-6">
-                        <h3 class="text-xl font-semibold text-slate-800 mb-3 flex items-center">
-                            <span class="text-xl mr-2">🤖</span>
-                            <span id="summaryTitle">AI总结</span>
-                        </h3>
-                        <div class="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-6 border border-blue-200">
-                            <div id="summaryText" class="prose prose-slate max-w-none text-base leading-relaxed whitespace-pre-line"></div>
+                    <!-- Tab Content -->
+                    <div id="tabContent" class="min-h-96">
+                        <!-- Summary Tab Content -->
+                        <div id="summaryTabContent" class="tab-content hidden">
+                            <div class="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-6 border border-blue-200">
+                                <div id="summaryText" class="prose prose-slate max-w-none text-base leading-relaxed whitespace-pre-line"></div>
+                            </div>
                         </div>
-                    </div>
 
-                    <!-- Translation Section -->
-                    <div id="translationSection" class="hidden mb-6">
-                        <h3 class="text-xl font-semibold text-slate-800 mb-3 flex items-center">
-                            <span class="text-xl mr-2">🌍</span>
-                            <span id="translationTitle">翻译</span>
-                        </h3>
-                        <div class="bg-gradient-to-r from-green-50 to-teal-50 rounded-xl p-6 border border-green-200">
-                            <div id="translationText" class="prose prose-slate max-w-none text-base leading-relaxed whitespace-pre-line"></div>
+                        <!-- Transcript Tab Content -->
+                        <div id="transcriptTabContent" class="tab-content hidden">
+                            <div class="bg-slate-50 rounded-xl p-6 border border-slate-200">
+                                <div id="transcriptText" class="prose prose-slate max-w-none text-base leading-relaxed whitespace-pre-line"></div>
+                            </div>
+                        </div>
+
+                        <!-- Translation Tab Content -->
+                        <div id="translationTabContent" class="tab-content hidden">
+                            <div class="bg-gradient-to-r from-green-50 to-teal-50 rounded-xl p-6 border border-green-200">
+                                <div id="translationText" class="prose prose-slate max-w-none text-base leading-relaxed whitespace-pre-line"></div>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Download Section -->
-                    <div id="downloadSection" class="hidden mt-1 mb-4">
+                    <div id="downloadSection" class="hidden mt-6 mb-4">
                         <div class="flex flex-wrap gap-6 justify-center" id="downloadButtons">
                             <!-- Download links will be added here by JavaScript -->
                         </div>
@@ -428,6 +448,6 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=2.5"></script>
 </body>
 </html>

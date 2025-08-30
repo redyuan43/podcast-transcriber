@@ -83,7 +83,7 @@ const openai = new OpenAI({
  * @param {string} outputLanguage - 输出语言
  * @returns {Promise<Object>} - 处理结果
  */
-async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outputLanguage = 'zh', tempDir = null, audioLanguage = 'auto', originalUrl = null) {
+async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outputLanguage = 'zh', tempDir = null, audioLanguage = 'auto', originalUrl = null, sessionId = null, sendProgressCallback = null) {
     try {
         console.log(`🤖 开始音频处理 - OpenAI`);
         
@@ -102,7 +102,8 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
             const scriptPath = path.join(__dirname, '..', 'whisper_transcribe.py');
             const timestamp = Date.now();
             const filePrefix = `podcast_${timestamp}`;
-            const command = `python3 "${scriptPath}" "${files[0]}" --model ${process.env.WHISPER_MODEL || 'base'} --save-transcript "${tempDir}" --file-prefix "${filePrefix}"`;
+            const venvPython = path.join(__dirname, '..', '..', 'venv', 'bin', 'python');
+            const command = `"${venvPython}" "${scriptPath}" "${files[0]}" --model ${process.env.WHISPER_MODEL || 'base'} --save-transcript "${tempDir}" --file-prefix "${filePrefix}"`;
             
             console.log(`🎤 Python脚本转录并保存: ${path.basename(files[0])}`);
             console.log(`⚙️ 执行命令: ${command}`);
@@ -110,7 +111,7 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
             const { stdout, stderr } = await execAsync(command, {
                 cwd: path.join(__dirname, '..'),
                 maxBuffer: 1024 * 1024 * 20,
-                timeout: 1200000
+                timeout: 3600000 // 1小时超时，支持长音频
             });
             
             if (stderr && stderr.trim()) {
@@ -189,6 +190,10 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
             // 如果需要总结，使用优化后的转录文本进行AI总结
             if (shouldSummarize) {
                 console.log(`📝 开始生成总结...`);
+                if (sessionId && sendProgressCallback) {
+                    const stageText = outputLanguage === 'zh' ? '总结' : 'Summary';
+                    sendProgressCallback(sessionId, 70, 'summary', stageText);
+                }
                 const summary = await generateSummary(transcript, outputLanguage);
                 
                 // 保存AI总结（Markdown格式）
@@ -431,7 +436,8 @@ async function transcribeAudioLocal(audioPath, language = null, shouldSaveDirect
         
         // 构建Python命令
         const scriptPath = path.join(__dirname, '..', 'whisper_transcribe.py');
-        let command = `python3 "${scriptPath}" "${audioPath}" --model ${WHISPER_MODEL}`;
+        const venvPython = path.join(__dirname, '..', '..', 'venv', 'bin', 'python');
+        let command = `"${venvPython}" "${scriptPath}" "${audioPath}" --model ${WHISPER_MODEL}`;
         
         if (language) {
             command += ` --language ${language}`;
@@ -1664,7 +1670,7 @@ async function translateInChunks(transcript, sourceName, targetName) {
     
     // 将文本按段落和句子智能分块
     const chunkSize = 3500; // 较保守的分块大小
-    const chunks = smartSplitText(transcript, chunkSize);
+    const chunks = smartSplitLongChunk(transcript, chunkSize);
     
     console.log(`📊 文本分为 ${chunks.length} 块进行翻译`);
     

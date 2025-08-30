@@ -19,7 +19,9 @@ async function parseRSSFeed(rssUrl) {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
             },
-            timeout: 15000
+            timeout: 0, // 无超时限制
+            maxContentLength: Infinity, // 无大小限制
+            maxBodyLength: Infinity
         });
 
         const parser = new xml2js.Parser();
@@ -160,7 +162,7 @@ async function discoverRSSFromPage(pageUrl) {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
             },
-            timeout: 10000
+            timeout: 0 // 无超时限制
         });
 
         const html = response.data;
@@ -221,7 +223,7 @@ async function getXiaoyuzhouRSS(episodeUrl) {
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
                 },
-                timeout: 10000
+                timeout: 0 // 无超时限制
             });
 
             // 如果API返回了音频信息

@@ -96,7 +96,7 @@ async function extractApplePodcastAudio(url) {
         console.log(`查询iTunes API: ${itunesApiUrl}`);
         
         const itunesResponse = await axios.get(itunesApiUrl, { 
-            timeout: 10000,
+            timeout: 0, // 无超时限制
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             }
@@ -180,7 +180,7 @@ async function extractFromApplePodcastsPage(url) {
     try {
         // 直接抓取网页内容
         const response = await axios.get(url, {
-            timeout: 15000,
+            timeout: 0, // 无超时限制
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -345,7 +345,7 @@ async function extractGenericPodcastAudio(url) {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
             },
-            timeout: 10000
+            timeout: 0, // 无超时限制
         });
 
         // 方法3: 如果响应是XML/RSS
@@ -419,8 +419,8 @@ async function downloadAudioFile(audioUrl) {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
             },
-            timeout: 120000, // 120秒超时
-            maxContentLength: 100 * 1024 * 1024, // 最大100MB
+            timeout: 0, // 无超时限制
+            maxContentLength: Infinity, // 无大小限制
         });
 
         // 检查内容类型和长度

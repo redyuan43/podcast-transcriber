@@ -37,16 +37,66 @@ const upload = multer({
     }
 });
 
+// 进度推送存储
+const progressClients = new Map();
+
+// SSE 进度推送端点
+app.get('/api/progress/:sessionId', (req, res) => {
+    const sessionId = req.params.sessionId;
+    console.log(`🔌 新的SSE连接: sessionId=${sessionId}`);
+    
+    // 设置 SSE 头
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+    });
+
+    // 存储客户端连接
+    progressClients.set(sessionId, res);
+    console.log(`📝 已存储客户端连接，当前连接数: ${progressClients.size}`);
+    
+    // 发送初始连接确认
+    res.write(`data: ${JSON.stringify({ type: 'connected', sessionId })}\n\n`);
+    
+    // 客户端断开连接时清理
+    req.on('close', () => {
+        console.log(`🔌 SSE连接断开: sessionId=${sessionId}`);
+        progressClients.delete(sessionId);
+    });
+});
+
+// 发送进度更新的辅助函数
+function sendProgress(sessionId, progress, stage, stageText) {
+    console.log(`📊 尝试发送进度: sessionId=${sessionId}, progress=${progress}%, stage=${stage}, text=${stageText}`);
+    const client = progressClients.get(sessionId);
+    if (client) {
+        const data = {
+            type: 'progress',
+            progress: Math.round(progress),
+            stage,
+            stageText
+        };
+        console.log(`✅ 发送进度更新: ${JSON.stringify(data)}`);
+        client.write(`data: ${JSON.stringify(data)}\n\n`);
+    } else {
+        console.log(`❌ 未找到 sessionId=${sessionId} 的客户端连接`);
+    }
+}
+
 // API路由
 app.post('/api/process-podcast', async (req, res) => {
     try {
-        const { url, operation, audioLanguage, outputLanguage } = req.body;
+        const { url, operation, audioLanguage, outputLanguage, sessionId } = req.body;
 
         console.log('处理播客请求:', {
             url,
             operation,
             audioLanguage,
-            outputLanguage
+            outputLanguage,
+            sessionId
         });
 
         // 验证输入
@@ -66,6 +116,11 @@ app.post('/api/process-podcast', async (req, res) => {
 
         // 步骤1: 下载音频文件
         console.log('下载音频文件...');
+        if (sessionId) {
+            const stageText = outputLanguage === 'zh' ? '处理音频' : 'Processing Audio';
+            sendProgress(sessionId, 10, 'download', stageText);
+        }
+        
         const originalAudioPath = await downloadPodcastAudio(url);
         
         if (!originalAudioPath) {
@@ -77,6 +132,11 @@ app.post('/api/process-podcast', async (req, res) => {
 
         // 步骤2: 基于文件大小估算时长（用于初始预估）
         console.log('📊 估算音频时长...');
+        if (sessionId) {
+            const stageText = outputLanguage === 'zh' ? '处理音频' : 'Processing Audio';
+            sendProgress(sessionId, 20, 'download', stageText);
+        }
+        
         const estimatedDuration = await estimateAudioDuration(originalAudioPath);
         console.log(`🎯 预估时长: ${Math.round(estimatedDuration / 60)} 分钟 ${Math.round(estimatedDuration % 60)} 秒`);
 
@@ -89,7 +149,12 @@ app.post('/api/process-podcast', async (req, res) => {
         
         // 步骤4: 使用本地Whisper处理音频
         console.log(`🤖 本地转录处理 ${audioFiles.length} 个音频文件...`);
-        const result = await processAudioWithOpenAI(audioFiles, shouldSummarize, outputLanguage, tempDir, audioLanguage, url);
+        if (sessionId) {
+            const stageText = outputLanguage === 'zh' ? '转录' : 'Transcription';
+            sendProgress(sessionId, 30, 'transcription', stageText);
+        }
+        
+        const result = await processAudioWithOpenAI(audioFiles, shouldSummarize, outputLanguage, tempDir, audioLanguage, url, sessionId, sendProgress);
 
         // 步骤4: 获取保存的文件信息
         const savedFiles = result.savedFiles || [];
@@ -102,6 +167,12 @@ app.post('/api/process-podcast', async (req, res) => {
 
         // 步骤5: 清理音频临时文件
         cleanupAudioFiles(originalAudioPath, audioFiles);
+
+        // 发送完成进度
+        if (sessionId) {
+            const stageText = outputLanguage === 'zh' ? '处理完成' : 'Complete';
+            sendProgress(sessionId, 100, 'complete', stageText);
+        }
 
         // 返回结果（包含估算和真实时长）
         res.json({
