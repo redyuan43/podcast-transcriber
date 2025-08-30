@@ -7,9 +7,38 @@ const { promisify } = require('util');
 const execAsync = promisify(exec);
 
 /**
+ * 将翻译内容格式化为Markdown
+ */
+function formatTranslationAsMarkdown(translatedText, audioFilePath, targetLanguage = 'zh', sourceUrl = null) {
+    const audioName = audioFilePath ? path.basename(audioFilePath, path.extname(audioFilePath)) : '';
+    
+    // 多语言标题
+    const titles = {
+        zh: '# 🌍 Podcast翻译',
+        en: '# 🌍 Podcast Translation',
+        es: '# 🌍 Traducción del Podcast',
+        fr: '# 🌍 Traduction du Podcast',
+        de: '# 🌍 Podcast-Übersetzung'
+    };
+    
+    const title = titles[targetLanguage] || titles.en;
+    
+    // 如果有音频名称，使用具体名称；否则用通用标题
+    const finalTitle = audioName ? `# 🌍 ${audioName}` : title;
+    
+    // 添加source链接（如果提供）
+    const sourceSection = sourceUrl ? `\n\n---\n\n**Source:** ${sourceUrl}` : '';
+    
+    return `${finalTitle}
+
+${translatedText}${sourceSection}
+`;
+}
+
+/**
  * 将总结格式化为Markdown - 简洁版本
  */
-function formatSummaryAsMarkdown(summary, audioFilePath, outputLanguage = 'zh') {
+function formatSummaryAsMarkdown(summary, audioFilePath, outputLanguage = 'zh', sourceUrl = null) {
     const audioName = audioFilePath ? path.basename(audioFilePath, path.extname(audioFilePath)) : '';
     
     // 多语言标题
@@ -26,9 +55,12 @@ function formatSummaryAsMarkdown(summary, audioFilePath, outputLanguage = 'zh') 
     // 如果有音频名称，使用具体名称；否则用通用标题
     const finalTitle = audioName ? `# 🎙️ ${audioName}` : title;
     
+    // 添加source链接（如果提供）
+    const sourceSection = sourceUrl ? `\n\n---\n\n**Source:** ${sourceUrl}` : '';
+    
     return `${finalTitle}
 
-${summary}
+${summary}${sourceSection}
 `;
 }
 
@@ -51,7 +83,7 @@ const openai = new OpenAI({
  * @param {string} outputLanguage - 输出语言
  * @returns {Promise<Object>} - 处理结果
  */
-async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outputLanguage = 'zh', tempDir = null, audioLanguage = 'auto') {
+async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outputLanguage = 'zh', tempDir = null, audioLanguage = 'auto', originalUrl = null) {
     try {
         console.log(`🤖 开始音频处理 - OpenAI`);
         
@@ -94,7 +126,11 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
             transcript = result.text || '';
             savedFiles = result.savedFiles || [];
             
+            // 获取检测到的语言信息
+            result.detectedLanguage = result.language || audioLanguage || 'auto';
+            
             console.log(`✅ Python脚本转录完成: ${transcript.length} 字符`);
+            console.log(`🌐 检测到语言: ${result.detectedLanguage}`);
             console.log(`💾 Python脚本保存了 ${savedFiles.length} 个文件`);
 
             // 对转录文本进行智能优化（错别字修正+格式化）
@@ -158,7 +194,7 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
                 // 保存AI总结（Markdown格式）
                 const summaryFileName = `${filePrefix}_summary.md`;
                 const summaryPath = path.join(tempDir, summaryFileName);
-                const markdownSummary = formatSummaryAsMarkdown(summary, files[0], outputLanguage);
+                const markdownSummary = formatSummaryAsMarkdown(summary, files[0], outputLanguage, originalUrl);
                 fs.writeFileSync(summaryPath, markdownSummary, 'utf8');
                 
                 savedFiles.push({
@@ -173,11 +209,48 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
                 // 更新result中的summary
                 result.summary = summary;
             }
+            
+            // 检查是否需要翻译
+            if (result.detectedLanguage && needsTranslation(result.detectedLanguage, outputLanguage)) {
+                console.log(`🌍 检测到语言差异 (${result.detectedLanguage} ≠ ${outputLanguage})，开始翻译...`);
+                
+                try {
+                    const translatedTranscript = await translateTranscript(transcript, result.detectedLanguage, outputLanguage);
+                    
+                    // 保存翻译结果（Markdown格式）
+                    const translationFileName = `${filePrefix}_translation.md`;
+                    const translationPath = path.join(tempDir, translationFileName);
+                    const markdownTranslation = formatTranslationAsMarkdown(translatedTranscript, files[0], outputLanguage, originalUrl);
+                    fs.writeFileSync(translationPath, markdownTranslation, 'utf8');
+                    
+                    savedFiles.push({
+                        type: 'translation',
+                        filename: translationFileName,
+                        path: translationPath,
+                        size: fs.statSync(translationPath).size
+                    });
+                    
+                    console.log(`🌍 翻译已保存: ${translationFileName}`);
+                    
+                    // 更新result中的translation信息
+                    result.translation = translatedTranscript;
+                    result.needsTranslation = true;
+                } catch (error) {
+                    console.error('❌ 翻译过程失败:', error.message);
+                    result.needsTranslation = false;
+                }
+            } else {
+                console.log(`✅ 无需翻译 (语言一致: ${result.detectedLanguage} = ${outputLanguage})`);
+                result.needsTranslation = false;
+            }
             // 返回处理后的结果
             return {
                 transcript: transcript,
                 summary: result.summary || null, // 如果有总结则包含
+                translation: result.translation || null, // 如果有翻译则包含
                 language: outputLanguage,
+                detectedLanguage: result.detectedLanguage,
+                needsTranslation: result.needsTranslation || false,
                 audioDuration: result.audioDuration, // 从Whisper获取的真实音频时长
                 savedFiles: savedFiles
             };
@@ -248,7 +321,7 @@ async function transcribeMultipleAudios(audioFiles, outputLanguage, shouldSaveDi
                         console.log(`   🎵 开始转录片段 ${index + 1}/${audioFiles.length}: ${path.basename(file)} ${retryCount > 0 ? `(重试 ${retryCount})` : ''}`);
                         
                         // 使用新的本地转录函数，支持保存参数
-                        const result = await transcribeAudioLocal(file, null, shouldSaveDirectly, tempDir);
+                        const result = await transcribeAudioLocal(file, null, shouldSaveDirectly, tempDir, originalUrl);
                         const transcript = typeof result === 'string' ? result : result.text || '';
                         
                         console.log(`   ✅ 片段 ${index + 1} 转录完成 (${transcript.length} 字符)`);
@@ -352,7 +425,7 @@ async function transcribeMultipleAudios(audioFiles, outputLanguage, shouldSaveDi
  * @param {string} language - 语言代码（可选）
  * @returns {Promise<string>} - 转录文本
  */
-async function transcribeAudioLocal(audioPath, language = null, shouldSaveDirectly = false, tempDir = null) {
+async function transcribeAudioLocal(audioPath, language = null, shouldSaveDirectly = false, tempDir = null, originalUrl = null) {
     try {
         console.log(`🎤 本地转录: ${path.basename(audioPath)}`);
         
@@ -370,6 +443,11 @@ async function transcribeAudioLocal(audioPath, language = null, shouldSaveDirect
             const filePrefix = `podcast_${timestamp}`;
             command += ` --save-transcript "${tempDir}" --file-prefix "${filePrefix}"`;
             console.log(`💾 将直接保存转录文本到: ${tempDir}`);
+        }
+        
+        // 添加source URL（如果提供）
+        if (originalUrl) {
+            command += ` --source-url "${originalUrl}"`;
         }
         
         console.log(`⚙️ 执行命令: ${command}`);
@@ -1505,6 +1583,151 @@ async function formatLongTranscriptInChunks(rawTranscript, transcriptLanguage, m
     }
 }
 
+/**
+ * 翻译转录内容
+ * @param {string} transcript - 原始转录内容
+ * @param {string} sourceLanguage - 源语言
+ * @param {string} targetLanguage - 目标语言
+ * @returns {Promise<string>} - 翻译后的内容
+ */
+async function translateTranscript(transcript, sourceLanguage, targetLanguage) {
+    try {
+        console.log(`🌍 翻译转录内容 (${sourceLanguage} → ${targetLanguage})...`);
+        
+        // 语言映射
+        const languageNames = {
+            zh: '中文',
+            en: '英文',
+            es: '西班牙语',
+            fr: '法语',
+            de: '德语'
+        };
+        
+        const sourceName = languageNames[sourceLanguage] || sourceLanguage;
+        const targetName = languageNames[targetLanguage] || targetLanguage;
+        
+        // 智能处理不同长度的文本
+        const maxCharsForDirectTranslation = 6000;
+        
+        if (transcript.length <= maxCharsForDirectTranslation) {
+            // 对于适中长度的文本，直接翻译
+            return await translateDirect(transcript, sourceName, targetName);
+        } else {
+            // 对于长文本，使用分块翻译策略
+            return await translateInChunks(transcript, sourceName, targetName);
+        }
+        
+    } catch (error) {
+        console.error('❌ 翻译失败:', error.message);
+        throw error;
+    }
+}
+
+/**
+ * 直接翻译（适用于中等长度文本）
+ */
+async function translateDirect(transcript, sourceName, targetName) {
+    const prompt = `你是一个专业的播客内容翻译专家。请将以下${sourceName}播客转录内容翻译成${targetName}：
+
+翻译要求：
+1. 保持原文的语言风格和表达习惯
+2. 准确传达原意和语境
+3. 保持段落结构和格式
+4. 对于专业术语和人名地名，使用通用翻译标准
+5. 保持语言的自然流畅
+
+请直接输出翻译结果，不要添加额外说明。
+
+原文内容：
+${transcript}`;
+
+    const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+            {
+                role: "user",
+                content: prompt
+            }
+        ],
+        temperature: 0.1,
+        max_tokens: 4000
+    });
+
+    return response.choices[0].message.content.trim();
+}
+
+/**
+ * 分块翻译（适用于长文本）
+ */
+async function translateInChunks(transcript, sourceName, targetName) {
+    console.log(`📄 文本过长 (${transcript.length} 字符)，使用智能分块翻译策略`);
+    
+    // 将文本按段落和句子智能分块
+    const chunkSize = 3500; // 较保守的分块大小
+    const chunks = smartSplitText(transcript, chunkSize);
+    
+    console.log(`📊 文本分为 ${chunks.length} 块进行翻译`);
+    
+    const translatedChunks = [];
+    
+    for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        console.log(`🔄 翻译第 ${i + 1}/${chunks.length} 块 (${chunk.length} 字符)`);
+        
+        try {
+            const translatedChunk = await translateDirect(chunk, sourceName, targetName);
+            translatedChunks.push(translatedChunk);
+            
+            // 添加延迟避免API限制
+            if (i < chunks.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        } catch (error) {
+            console.error(`❌ 翻译第 ${i + 1} 块失败:`, error.message);
+            // 如果翻译失败，保留原文
+            translatedChunks.push(chunk);
+        }
+    }
+    
+    const finalTranslation = translatedChunks.join('\n\n');
+    console.log(`✅ 智能分块翻译完成: ${transcript.length} → ${finalTranslation.length} 字符`);
+    
+    return finalTranslation;
+}
+
+/**
+ * 检测语言是否需要翻译
+ * @param {string} detectedLanguage - Whisper检测的语言
+ * @param {string} targetLanguage - 用户选择的输出语言
+ * @returns {boolean} - 是否需要翻译
+ */
+function needsTranslation(detectedLanguage, targetLanguage) {
+    // 语言代码标准化
+    const normalizeLanguage = (lang) => {
+        if (!lang) return 'unknown';
+        const langMap = {
+            'en': 'en',
+            'english': 'en',
+            'zh': 'zh',
+            'chinese': 'zh',
+            'zh-cn': 'zh',
+            'zh-hans': 'zh',
+            'es': 'es',
+            'spanish': 'es',
+            'fr': 'fr',
+            'french': 'fr',
+            'de': 'de',
+            'german': 'de'
+        };
+        return langMap[lang.toLowerCase()] || lang.toLowerCase();
+    };
+    
+    const normalizedDetected = normalizeLanguage(detectedLanguage);
+    const normalizedTarget = normalizeLanguage(targetLanguage);
+    
+    return normalizedDetected !== normalizedTarget && normalizedDetected !== 'unknown';
+}
+
 module.exports = {
     processAudioWithOpenAI,
     transcribeAudio,
@@ -1512,6 +1735,9 @@ module.exports = {
     transcribeMultipleAudios,
     formatTranscriptText,
     formatSummaryAsMarkdown,
+    formatTranslationAsMarkdown,
     optimizeTranscriptContinuity,
-    generateSummary
+    generateSummary,
+    translateTranscript,
+    needsTranslation
 };

@@ -19,6 +19,7 @@ const translations = {
         resultsTitle: "处理结果",
         transcriptTitle: "转录文本",
         summaryTitle: "AI总结",
+        translationTitle: "翻译",
         loadingText: "正在处理您的播客...",
         errorText: "处理过程中出现错误",
         estimatedTime: "预计需要 3-8 分钟...",
@@ -55,6 +56,7 @@ const translations = {
         resultsTitle: "Results",
         transcriptTitle: "Transcript",
         summaryTitle: "AI Summary",
+        translationTitle: "Translation",
         loadingText: "Processing your podcast...",
         errorText: "An error occurred during processing",
         estimatedTime: "Estimated 3-8 minutes...",
@@ -621,6 +623,7 @@ function showResultsContent(data, operation = 'transcribe_only') {
     // 获取区域元素
     const transcriptSection = document.getElementById('transcriptSection');
     const summarySection = document.getElementById('summarySection');
+    const translationSection = document.getElementById('translationSection');
     
     // 显示转录文本（Markdown渲染）
     const transcriptText = document.getElementById('transcriptText');
@@ -637,27 +640,58 @@ function showResultsContent(data, operation = 'transcribe_only') {
         summarySection.classList.add('hidden');
     }
     
+    // 显示翻译（如果需要且有翻译内容）
+    const translationText = document.getElementById('translationText');
+    
+    if (data.needsTranslation && data.translation) {
+        translationSection.classList.remove('hidden');
+        translationText.innerHTML = marked.parse(data.translation);
+        console.log('🌍 显示翻译内容');
+    } else {
+        translationSection.classList.add('hidden');
+        console.log('✅ 无需显示翻译');
+    }
+    
     // 根据操作模式调整显示顺序
     const downloadSection = document.getElementById('downloadSection');
     
     if (operation === 'transcribe_summarize' && data.summary) {
-        // 转录+总结模式：下载 → 总结 → 转录
+        // 转录+总结模式：下载 → 总结 → 翻译（如果有）→ 转录
         downloadSection.style.order = '1';
         summarySection.style.order = '2';
-        transcriptSection.style.order = '3';
-        const orderMsg = currentLang === 'zh' ? 
-            '📋 显示顺序：下载 → AI总结 → 转录文本' : 
-            '📋 Display order: Download → AI Summary → Transcript';
-        console.log(orderMsg);
+        
+        if (data.needsTranslation && data.translation) {
+            translationSection.style.order = '3';
+            transcriptSection.style.order = '4';
+            const orderMsg = currentLang === 'zh' ? 
+                '📋 显示顺序：下载 → AI总结 → 翻译 → 转录文本' : 
+                '📋 Display order: Download → AI Summary → Translation → Transcript';
+            console.log(orderMsg);
+        } else {
+            transcriptSection.style.order = '3';
+            const orderMsg = currentLang === 'zh' ? 
+                '📋 显示顺序：下载 → AI总结 → 转录文本' : 
+                '📋 Display order: Download → AI Summary → Transcript';
+            console.log(orderMsg);
+        }
     } else {
-        // 仅转录模式：下载 → 转录（AI总结区域隐藏，不参与排序）
+        // 仅转录模式：下载 → 翻译（如果有）→ 转录
         downloadSection.style.order = '1';
-        transcriptSection.style.order = '2';
-        // summarySection 已被隐藏，不需要设置order
-        const orderMsg = currentLang === 'zh' ? 
-            '📝 显示顺序：下载 → 转录文本' : 
-            '📝 Display order: Download → Transcript';
-        console.log(orderMsg);
+        
+        if (data.needsTranslation && data.translation) {
+            translationSection.style.order = '2';
+            transcriptSection.style.order = '3';
+            const orderMsg = currentLang === 'zh' ? 
+                '📝 显示顺序：下载 → 翻译 → 转录文本' : 
+                '📝 Display order: Download → Translation → Transcript';
+            console.log(orderMsg);
+        } else {
+            transcriptSection.style.order = '2';
+            const orderMsg = currentLang === 'zh' ? 
+                '📝 显示顺序：下载 → 转录文本' : 
+                '📝 Display order: Download → Transcript';
+            console.log(orderMsg);
+        }
     }
     
     // 显示下载按钮（如果有保存的文件）

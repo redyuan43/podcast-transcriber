@@ -110,13 +110,14 @@ class LocalWhisperTranscriber:
         
         return results
 
-def format_transcript_as_markdown(transcript_text, original_filename=None):
+def format_transcript_as_markdown(transcript_text, original_filename=None, source_url=None):
     """
     将转录文本格式化为Markdown
     
     Args:
         transcript_text: 原始转录文本
         original_filename: 原始音频文件名
+        source_url: 播客来源链接
     
     Returns:
         str: 格式化的Markdown内容
@@ -134,14 +135,17 @@ def format_transcript_as_markdown(transcript_text, original_filename=None):
     # 构建Markdown内容 - 简洁版本
     title = f"# 🎙️ {audio_name}" if audio_name != "未知" else "# 🎙️ Podcast转录"
     
+    # 添加source链接（如果提供）
+    source_section = f"\n\n---\n\n**Source:** {source_url}" if source_url else ""
+    
     markdown_content = f"""{title}
 
-{transcript_text}
+{transcript_text}{source_section}
 """
     
     return markdown_content
 
-def save_transcript_to_file(transcript_text, save_dir, file_prefix=None, original_filename=None):
+def save_transcript_to_file(transcript_text, save_dir, file_prefix=None, original_filename=None, source_url=None):
     """
     保存转录文本到文件
     
@@ -150,6 +154,7 @@ def save_transcript_to_file(transcript_text, save_dir, file_prefix=None, origina
         save_dir: 保存目录
         file_prefix: 文件前缀
         original_filename: 原始音频文件名
+        source_url: 播客来源链接
     
     Returns:
         dict: 保存的文件信息
@@ -172,7 +177,7 @@ def save_transcript_to_file(transcript_text, save_dir, file_prefix=None, origina
         file_path = save_path / filename
         
         # 格式化为Markdown
-        markdown_content = format_transcript_as_markdown(transcript_text, original_filename)
+        markdown_content = format_transcript_as_markdown(transcript_text, original_filename, source_url)
         
         # 保存文件
         with open(file_path, 'w', encoding='utf-8') as f:
@@ -210,6 +215,7 @@ def main():
     parser.add_argument("--output", help="输出JSON文件路径")
     parser.add_argument("--save-transcript", help="直接保存转录文本到指定目录")
     parser.add_argument("--file-prefix", help="保存文件的前缀名称")
+    parser.add_argument("--source-url", help="播客来源链接")
     
     args = parser.parse_args()
     
@@ -243,7 +249,8 @@ def main():
                 transcript_text=result['text'],
                 save_dir=args.save_transcript,
                 file_prefix=args.file_prefix,
-                original_filename=audio_files[0] if len(audio_files) == 1 else None
+                original_filename=audio_files[0] if len(audio_files) == 1 else None,
+                source_url=args.source_url
             )
             if file_info:
                 saved_files.append(file_info)

@@ -89,7 +89,7 @@ app.post('/api/process-podcast', async (req, res) => {
         
         // 步骤4: 使用本地Whisper处理音频
         console.log(`🤖 本地转录处理 ${audioFiles.length} 个音频文件...`);
-        const result = await processAudioWithOpenAI(audioFiles, shouldSummarize, outputLanguage, tempDir, audioLanguage);
+        const result = await processAudioWithOpenAI(audioFiles, shouldSummarize, outputLanguage, tempDir, audioLanguage, url);
 
         // 步骤4: 获取保存的文件信息
         const savedFiles = result.savedFiles || [];
@@ -161,7 +161,7 @@ app.post('/api/process-local-file', async (req, res) => {
         
         // 使用本地Whisper处理音频
         console.log(`🤖 本地转录处理文件: ${filename}`);
-        const result = await processAudioWithOpenAI([filePath], shouldSummarize, outputLanguage, tempDir, audioLanguage);
+        const result = await processAudioWithOpenAI([filePath], shouldSummarize, outputLanguage, tempDir, audioLanguage, null);
 
         // 获取保存的文件信息
         const savedFiles = result.savedFiles || [];
