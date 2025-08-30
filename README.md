@@ -20,6 +20,8 @@ Podcast Transcriber is a full-stack web application designed to bridge the gap b
 - **🚀 Performance First**: Using OpenAI Faster-Whisper model for speech-to-text
 - **🤖 AI Intelligent Optimization**: AI-optimized transcription and summary text based on podcast content characteristics
 - **📱 Responsive Design**: Modern mobile-first UI, friendly experience for both desktop and mobile
+- **🌍 Conditional Translation (New)**: When the selected summary language differs from the detected transcript language, the system auto-translates with GPT‑4o, saves a `*_translation.md`, and shows a Translation section in the UI. Hidden when languages match.
+- **🔗 Source Link in Markdown (New)**: Transcript and summary markdown files append a Source link to the original podcast URL.
 
 ## 🏗️ Architecture & Implementation
 
@@ -148,6 +150,8 @@ Create a `.env` file with the following variables:
 ```env
 # OpenAI Configuration (for text optimization and summarization only)
 OPENAI_API_KEY=your_openai_api_key_here
+# Optional: custom OpenAI base URL (compatible endpoint)
+OPENAI_BASE_URL=https://api.openai.com/v1
 
 # Local Whisper Configuration
 USE_LOCAL_WHISPER=true

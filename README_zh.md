@@ -20,6 +20,8 @@
 - **🚀 性能优先**：采用openai Faster-Whisper模型语音转文字
 - **🤖 AI智能优化**：根据播客内容特点AI优化转录和总结文本
 - **📱 响应式设计**：现代化移动优先UI，电脑端和手机端体验友好
+- **🌍 条件式翻译（新增）**：当所选总结语言与Whisper检测到的语言不一致时，自动调用GPT‑4o生成翻译并保存为`*_translation.md`，前端显示“翻译”区块；若语言一致则不显示。
+- **🔗 Markdown来源链接（新增）**：转录与总结的markdown底部自动追加原播客链接（Source）。
 
 ## 🏗️ 架构与实现
 
@@ -145,6 +147,8 @@ open http://localhost:3000
 ```env
 # OpenAI 配置（仅用于文本优化和总结）
 OPENAI_API_KEY=your_openai_api_key_here
+# 可选：自定义OpenAI Base URL（兼容端点）
+OPENAI_BASE_URL=https://api.openai.com/v1
 
 # 本地Whisper配置
 USE_LOCAL_WHISPER=true
