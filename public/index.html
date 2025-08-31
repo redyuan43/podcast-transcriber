@@ -212,6 +212,47 @@
             margin-top: 0 !important;
             margin-bottom: 0.3rem !important;
         }
+        
+        /* Translation区域：与Summary和Transcript完全一致的强力重置 */
+        #translationText.prose *,
+        #translationText.prose *:before,
+        #translationText.prose *:after {
+            margin-top: 0 !important;
+            margin-bottom: 0.3rem !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        
+        /* 特殊处理列表项，使用更小间距 */
+        #translationText.prose li {
+            margin-bottom: 0.15rem !important;
+        }
+        
+        /* 确保分割线样式 */
+        #translationText.prose hr {
+            margin: 0.3rem 0 !important;
+            height: 1px !important;
+            background-color: #e2e8f0 !important;
+            border: none !important;
+        }
+        
+        /* 重置所有可能的块级元素 */
+        #translationText.prose p,
+        #translationText.prose div,
+        #translationText.prose h1,
+        #translationText.prose h2,
+        #translationText.prose h3,
+        #translationText.prose h4,
+        #translationText.prose h5,
+        #translationText.prose h6,
+        #translationText.prose ul,
+        #translationText.prose ol,
+        #translationText.prose blockquote,
+        #translationText.prose pre,
+        #translationText.prose table {
+            margin-top: 0 !important;
+            margin-bottom: 0.3rem !important;
+        }
 
     </style>
 </head>
@@ -448,6 +489,6 @@
         </div>
     </div>
 
-    <script src="script.js?v=2.5"></script>
+    <script src="script.js?v=3.0"></script>
 </body>
 </html>

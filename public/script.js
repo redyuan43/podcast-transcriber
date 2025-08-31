@@ -528,12 +528,13 @@ class SmartProgressBar {
             this.detectStage(message, progress);
             
             console.log(`📊 服务器进度更新: ${progress}% - ${message}`);
-        }
-        
-        // 服务器进度更新：仅在收到新的服务器进度时跳跃
-        if (fromServer) {
-            console.log(`🔄 进度跳跃: ${this.currentProgress}% → ${this.serverProgress}%`);
-            this.currentProgress = this.serverProgress;
+            
+            // 服务器进度更新：始终跳跃到服务器进度（前进或后退）
+            if (this.serverProgress !== this.currentProgress) {
+                const direction = this.serverProgress > this.currentProgress ? '前进' : '后退';
+                console.log(`🔄 进度${direction}: ${this.currentProgress}% → ${this.serverProgress}%`);
+                this.currentProgress = this.serverProgress;
+            }
         }
         
         // 更新显示
@@ -625,9 +626,26 @@ class SmartProgressBar {
         const increment = this.calculateProgressIncrement();
         const newProgress = this.currentProgress + increment;
         
-        // 不超过当前阶段的最大进度，但不超过95%（为最终完成留空间）
-        const stageMax = this.stageConfig[this.currentStage]?.maxProgress || 95;
-        this.currentProgress = Math.min(newProgress, stageMax, 95);
+        // 设置上限：如果有服务器进度，不超过服务器进度+25%；否则根据阶段设置合理上限
+        let maxAllowed = 95;
+        if (this.serverProgress > 0) {
+            maxAllowed = Math.min(this.serverProgress + 25, 95);
+        } else {
+            // 没有服务器进度时，根据阶段设置合理的初始上限
+            const stageMaxLimits = {
+                'preparing': 8,      // 准备阶段最多到8%
+                'parsing': 15,       // 解析阶段最多到15%
+                'downloading': 25,   // 下载阶段最多到25%
+                'transcribing': 35,  // 转录阶段最多到35%
+                'optimizing': 55,    // 优化阶段最多到55%
+                'summarizing': 75,   // 摘要阶段最多到75%
+                'translating': 85,   // 翻译阶段最多到85%
+                'complete': 100      // 完成阶段到100%
+            };
+            maxAllowed = stageMaxLimits[this.currentStage] || 95;
+        }
+        
+        this.currentProgress = Math.min(newProgress, maxAllowed);
         
         // 更新显示
         this.updateProgressDisplay(this.currentProgress);
@@ -636,7 +654,7 @@ class SmartProgressBar {
     // 计算进度增量
     calculateProgressIncrement() {
         const stageMultipliers = {
-            'preparing': 0.3,     // 准备阶段较慢
+            'preparing': 0.6,     // 准备阶段中等速度
             'parsing': 0.8,       // 解析阶段较快
             'downloading': 0.3,   // 下载阶段较慢
             'transcribing': 0.2,  // 转录阶段最慢

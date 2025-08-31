@@ -138,6 +138,11 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
             let optimizedTranscript = transcript; // 默认使用原始文本
             let optimizationSuccess = false;
             
+            // 发送优化阶段进度
+            if (sendProgressCallback) {
+                sendProgressCallback(50, 'optimizing', outputLanguage === 'zh' ? '优化转录文本' : 'Optimizing transcript');
+            }
+            
             for (let retryCount = 0; retryCount < 3; retryCount++) {
                 try {
                     console.log(`📝 开始智能优化转录文本${retryCount > 0 ? ` (重试 ${retryCount}/3)` : ''}...`);
@@ -565,6 +570,8 @@ async function formatTranscriptText(rawTranscript, transcriptLanguage = 'zh') {
 
 **格式要求**：Markdown格式，段落间用双换行分隔，保持对话自然流畅性
 
+**重要提醒**：不要添加额外的分隔线（如---）或多余的空行，段落间只需标准的双换行分隔
+
 **核心原则**：优化可读性的同时保持原意，长篇论述按话题转换合理分段
 
 原始转录文本：
@@ -588,6 +595,8 @@ ${rawTranscript}` :
 3. **Length Control**: Single paragraphs should not exceed 300 words, long content must be segmented by complete thoughts
 
 **Format Requirements**: Markdown format, double line breaks between paragraphs, maintain natural conversational flow
+
+**Important Reminder**: Do not add extra separators (like ---) or excessive blank lines, use only standard double line breaks between paragraphs
 
 **Core Principle**: Optimize readability while preserving original meaning, segment long monologues by topic transitions
 
@@ -783,7 +792,7 @@ Summary requirements:
 Paragraph Organization Requirements (Core):
 1. **Organize by semantic and logical themes** - Start a new paragraph whenever the topic shifts, discussion focus changes, or when moving from one viewpoint to another
 2. **Each paragraph should focus on one main viewpoint or theme**
-3. **Paragraphs must be separated by blank lines (double line breaks \n\n)**
+3. **Paragraphs must be separated by double line breaks (\n\n)**
 4. **Think about the logical flow of content and reasonably divide paragraph boundaries**
 
 Format requirements:
@@ -1026,7 +1035,7 @@ async function generateChunkSummary(chunkText, outputLanguage) {
             { role: "user", content: chunkText }
         ],
         temperature: 0.3,
-        max_tokens: 800
+        max_tokens: 1200
     });
 
     const chunkSummary = response.choices[0].message.content.trim();
@@ -1056,8 +1065,8 @@ function getFinalSummaryPrompt(outputLanguage) {
 Requirements:
 1. Remove duplicate content and maintain clear logic
 2. Reorganize content by themes or chronological order
-3. Each paragraph must be separated by a blank line (double line breaks)
-4. Ensure output is in Markdown format with blank lines between paragraphs
+3. Each paragraph must be separated by double line breaks
+4. Ensure output is in Markdown format with double line breaks between paragraphs
 5. Use concise and clear English
 6. **Must output in English**
 7. Form a complete podcast content summary
@@ -1118,7 +1127,7 @@ async function generateFinalSummary(combinedSummary, outputLanguage) {
                     { role: "user", content: combinedSummary }
                 ],
                 temperature: 0.3,
-        max_tokens: 2500
+        max_tokens: 4000
     });
 
     const finalSummary = response.choices[0].message.content.trim();
@@ -1151,6 +1160,8 @@ async function formatSingleChunk(chunkText, transcriptLanguage = 'zh') {
 
 **格式要求**：Markdown格式，段落间用双换行分隔，保持对话自然流畅性
 
+**重要提醒**：不要添加额外的分隔线（如---）或多余的空行，段落间只需标准的双换行分隔
+
 **核心原则**：优化可读性的同时保持原意，长篇论述按话题转换合理分段
 
 **上下文处理**：如有[上文续：...]标记，利用上下文理解完整含义，但不要在输出中包含标记，不要重复上下文内容，只输出新内容部分
@@ -1176,6 +1187,8 @@ ${chunkText}` :
 3. **Length Control**: Single paragraphs should not exceed 300 words, long content must be segmented by complete thoughts
 
 **Format Requirements**: Markdown format, double line breaks between paragraphs, maintain natural conversational flow
+
+**Important Reminder**: Do not add extra separators (like ---) or excessive blank lines, use only standard double line breaks between paragraphs
 
 **Core Principle**: Optimize readability while preserving original meaning, segment long monologues by topic transitions
 
