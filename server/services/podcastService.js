@@ -7,25 +7,32 @@ const { parseRSSFeed, discoverRSSFromPage, getXiaoyuzhouRSS } = require('./rssPa
 /**
  * 下载播客音频文件
  * @param {string} url - 播客链接
- * @returns {Promise<string>} 下载的音频文件路径
+ * @returns {Promise<Object>} 包含音频文件路径和播客信息的对象
  */
 async function downloadPodcastAudio(url) {
     try {
         console.log(`开始处理播客链接: ${url}`);
 
-        // 检测链接类型并获取音频URL
-        const audioUrl = await extractAudioUrl(url);
+        // 检测链接类型并获取音频URL和播客信息
+        const podcastInfo = await extractAudioUrl(url);
         
-        if (!audioUrl) {
+        if (!podcastInfo || !podcastInfo.audioUrl) {
             throw new Error('无法提取音频链接 / Cannot extract audio URL');
         }
 
-        console.log(`提取到音频URL: ${audioUrl}`);
+        console.log(`提取到音频URL: ${podcastInfo.audioUrl}`);
+        if (podcastInfo.title) {
+            console.log(`播客标题: ${podcastInfo.title}`);
+        }
 
         // 下载音频文件
-        const audioFilePath = await downloadAudioFile(audioUrl);
+        const audioFilePath = await downloadAudioFile(podcastInfo.audioUrl);
         
-        return audioFilePath;
+        return {
+            audioFilePath,
+            title: podcastInfo.title || 'Untitled Podcast',
+            description: podcastInfo.description || ''
+        };
 
     } catch (error) {
         console.error('下载播客音频错误:', error);
@@ -34,15 +41,19 @@ async function downloadPodcastAudio(url) {
 }
 
 /**
- * 从播客链接提取音频URL
+ * 从播客链接提取音频URL和播客信息
  * @param {string} url - 播客链接
- * @returns {Promise<string>} 音频文件URL
+ * @returns {Promise<Object>} 包含音频URL和播客信息的对象
  */
 async function extractAudioUrl(url) {
     try {
         // 直接音频文件链接
         if (isDirectAudioUrl(url)) {
-            return url;
+            return {
+                audioUrl: url,
+                title: path.basename(url, path.extname(url)),
+                description: ''
+            };
         }
 
         // Apple Podcasts链接处理
@@ -136,7 +147,11 @@ async function extractApplePodcastAudio(url) {
             
             if (matchedItem) {
                 console.log(`✅ 找到匹配episode: ${matchedItem.title}`);
-                return matchedItem.audioUrl;
+                return {
+                    audioUrl: matchedItem.audioUrl,
+                    title: matchedItem.title || 'Untitled Episode',
+                    description: matchedItem.description || ''
+                };
             } else {
                 console.warn(`⚠️ 未找到episode ${episodeId}的匹配项，使用最新episode`);
             }
@@ -145,7 +160,11 @@ async function extractApplePodcastAudio(url) {
         // 返回第一个episode（最新）
         const firstItem = audioItems[0];
         console.log(`使用最新episode: ${firstItem.title}`);
-        return firstItem.audioUrl;
+        return {
+            audioUrl: firstItem.audioUrl,
+            title: firstItem.title || 'Untitled Episode',
+            description: firstItem.description || ''
+        };
 
     } catch (error) {
         console.error('Apple Podcasts解析失败:', error);
@@ -194,6 +213,54 @@ async function extractFromApplePodcastsPage(url) {
         
         const html = response.data;
         
+        // 提取页面标题，优先使用完整标题的提取方法
+        let pageTitle = 'Untitled Episode';
+        
+        // 方法1: 优先从og:title提取（通常是完整标题）
+        const ogTitleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i);
+        if (ogTitleMatch && ogTitleMatch[1].trim()) {
+            pageTitle = ogTitleMatch[1].trim();
+            console.log('✅ 使用og:title提取标题:', pageTitle);
+        } else {
+            // 方法2: 备用 - 从JSON-LD结构化数据中提取
+            const jsonLdMatches = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>(.*?)<\/script>/gs);
+            if (jsonLdMatches) {
+                for (const jsonLdMatch of jsonLdMatches) {
+                    try {
+                        const jsonLd = JSON.parse(jsonLdMatch.replace(/<script[^>]*>/, '').replace(/<\/script>/, ''));
+                        if (jsonLd.name && jsonLd.name.trim()) {
+                            pageTitle = jsonLd.name.trim();
+                            console.log('✅ 使用JSON-LD提取标题:', pageTitle);
+                            break;
+                        }
+                    } catch (e) {
+                        // 忽略JSON解析错误
+                    }
+                }
+            }
+            
+            // 方法3: 备用 - 从h1标签提取
+            if (pageTitle === 'Untitled Episode') {
+                const h1Match = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
+                if (h1Match) {
+                    const h1Title = h1Match[1].replace(/<[^>]*>/g, '').trim();
+                    if (h1Title) {
+                        pageTitle = h1Title;
+                        console.log('✅ 使用h1标签提取标题:', pageTitle);
+                    }
+                }
+            }
+            
+            // 方法4: 最后备用 - 从页面title标签提取（通常被截断）
+            if (pageTitle === 'Untitled Episode') {
+                const titleMatch = html.match(/<title>(.*?)<\/title>/i);
+                if (titleMatch) {
+                    pageTitle = titleMatch[1].replace(/\s*-\s*Apple Podcasts$/, '').trim();
+                    console.log('⚠️ 使用title标签提取标题（可能被截断）:', pageTitle);
+                }
+            }
+        }
+        
         // 尝试从网页中提取音频链接
         // 方案1: 查找JSON-LD数据
         const jsonLdMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>(.*?)<\/script>/s);
@@ -202,7 +269,11 @@ async function extractFromApplePodcastsPage(url) {
                 const jsonLd = JSON.parse(jsonLdMatch[1]);
                 if (jsonLd.url && jsonLd.url.includes('.mp3')) {
                     console.log('✅ 从JSON-LD中找到音频链接');
-                    return jsonLd.url;
+                    return {
+                        audioUrl: jsonLd.url,
+                        title: jsonLd.name || pageTitle,
+                        description: jsonLd.description || ''
+                    };
                 }
             } catch (e) {
                 console.log('JSON-LD解析失败，继续尝试其他方案');
@@ -213,14 +284,22 @@ async function extractFromApplePodcastsPage(url) {
         const acastMatch = html.match(/https?:\/\/[^"'\s]*acast[^"'\s]*\.mp3[^"'\s]*/i);
         if (acastMatch) {
             console.log('✅ 从HTML中找到Acast音频链接');
-            return acastMatch[0];
+            return {
+                audioUrl: acastMatch[0],
+                title: pageTitle,
+                description: ''
+            };
         }
         
         // 方案3: 查找其他直接音频链接  
         const audioLinkMatch = html.match(/https?:\/\/[^"'\s]+\.(mp3|m4a|wav)[^"'\s]*/);
         if (audioLinkMatch) {
             console.log('✅ 从HTML中找到音频链接');
-            return audioLinkMatch[0];
+            return {
+                audioUrl: audioLinkMatch[0],
+                title: pageTitle,
+                description: ''
+            };
         }
         
         // 方案4: 查找play按钮的data属性或href

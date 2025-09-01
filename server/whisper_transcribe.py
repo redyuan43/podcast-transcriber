@@ -110,12 +110,13 @@ class LocalWhisperTranscriber:
         
         return results
 
-def format_transcript_as_markdown(transcript_text, original_filename=None, source_url=None):
+def format_transcript_as_markdown(transcript_text, podcast_title=None, original_filename=None, source_url=None):
     """
     将转录文本格式化为Markdown
     
     Args:
         transcript_text: 原始转录文本
+        podcast_title: 播客标题
         original_filename: 原始音频文件名
         source_url: 播客来源链接
     
@@ -127,13 +128,14 @@ def format_transcript_as_markdown(transcript_text, original_filename=None, sourc
     # 获取当前时间
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # 获取音频文件信息
-    audio_name = "未知"
-    if original_filename:
+    # 优先使用播客标题，否则使用文件名
+    if podcast_title:
+        title = f"# 📝 {podcast_title}"
+    elif original_filename:
         audio_name = Path(original_filename).stem
-    
-    # 构建Markdown内容 - 简洁版本
-    title = f"# 🎙️ {audio_name}" if audio_name != "未知" else "# 🎙️ Podcast转录"
+        title = f"# 📝 {audio_name}"
+    else:
+        title = "# 📝 Podcast转录"
     
     # 添加source链接（如果提供）
     source_section = f"\n\n---\n\n**Source:** {source_url}" if source_url else ""
@@ -145,7 +147,7 @@ def format_transcript_as_markdown(transcript_text, original_filename=None, sourc
     
     return markdown_content
 
-def save_transcript_to_file(transcript_text, save_dir, file_prefix=None, original_filename=None, source_url=None):
+def save_transcript_to_file(transcript_text, save_dir, file_prefix=None, original_filename=None, source_url=None, podcast_title=None):
     """
     保存转录文本到文件
     
@@ -177,7 +179,7 @@ def save_transcript_to_file(transcript_text, save_dir, file_prefix=None, origina
         file_path = save_path / filename
         
         # 格式化为Markdown
-        markdown_content = format_transcript_as_markdown(transcript_text, original_filename, source_url)
+        markdown_content = format_transcript_as_markdown(transcript_text, podcast_title, original_filename, source_url)
         
         # 保存文件
         with open(file_path, 'w', encoding='utf-8') as f:
@@ -216,6 +218,7 @@ def main():
     parser.add_argument("--save-transcript", help="直接保存转录文本到指定目录")
     parser.add_argument("--file-prefix", help="保存文件的前缀名称")
     parser.add_argument("--source-url", help="播客来源链接")
+    parser.add_argument("--podcast-title", help="播客标题")
     
     args = parser.parse_args()
     
@@ -250,7 +253,8 @@ def main():
                 save_dir=args.save_transcript,
                 file_prefix=args.file_prefix,
                 original_filename=audio_files[0] if len(audio_files) == 1 else None,
-                source_url=args.source_url
+                source_url=args.source_url,
+                podcast_title=args.podcast_title
             )
             if file_info:
                 saved_files.append(file_info)

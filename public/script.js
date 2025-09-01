@@ -162,6 +162,8 @@ function updateUI() {
         // 获取当前的savedFiles数据并重新生成下载按钮
         updateDownloadButtonsLanguage();
     }
+    
+
 }
 
 // 表单提交处理
@@ -725,6 +727,15 @@ function showResultsContent(data, operation = 'transcribe_only') {
     document.getElementById('errorState').classList.add('hidden');
     document.getElementById('resultsContent').classList.remove('hidden');
     
+    // 显示播客标题（如果有）
+    if (data.podcastTitle) {
+        const podcastTitleSection = document.getElementById('podcastTitleSection');
+        const podcastTitleText = document.getElementById('podcastTitleText');
+        
+        podcastTitleText.textContent = data.podcastTitle;
+        podcastTitleSection.classList.remove('hidden');
+    }
+    
     // 准备标签页数据
     const tabs = [];
     
@@ -865,18 +876,22 @@ function showDownloadButtons(savedFiles) {
         const link = document.createElement('a');
         link.href = `/api/download/${file.filename}`;
         link.download = file.filename;
-        link.className = 'text-blue-600 hover:text-blue-800 underline hover:no-underline transition-colors font-medium';
+        link.className = 'bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 no-underline';
         
-        const nameMap = {
-            'transcript': currentLang === 'zh' ? '转录文本' : 'Transcript',
-            'summary': currentLang === 'zh' ? 'AI总结' : 'AI Summary'
+        const buttonTextMap = {
+            'transcript': currentLang === 'zh' ? 'Download Transcript' : 'Download Transcript',
+            'summary': currentLang === 'zh' ? 'Download Summary' : 'Download Summary',
+            'translation': currentLang === 'zh' ? 'Download Translation' : 'Download Translation'
         };
         
-        const downloadText = currentLang === 'zh' ? '下载' : 'Download';
-        const fileName = nameMap[file.type] || file.type;
-        const sizeText = formatFileSize(file.size);
+        const buttonText = buttonTextMap[file.type] || `Download ${file.type}`;
         
-        link.textContent = `${downloadText} ${fileName} (${sizeText})`;
+        // 创建文本内容
+        const textSpan = document.createElement('span');
+        textSpan.textContent = buttonText;
+        
+        // 添加到链接中
+        link.appendChild(textSpan);
         
         downloadButtons.appendChild(link);
     });
@@ -904,6 +919,8 @@ function updateDownloadButtonsLanguage() {
             type = 'transcript';
         } else if (filename.includes('_summary.')) {
             type = 'summary';
+        } else if (filename.includes('_translation.')) {
+            type = 'translation';
         }
         
         // 从链接文本中提取文件大小（提取括号中的内容）

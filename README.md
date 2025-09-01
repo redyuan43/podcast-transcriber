@@ -112,21 +112,28 @@ podcast-to-text/
 ### Prerequisites
 
 - **Node.js 16+**: Runtime environment
-- **Python 3.8+**: For local Faster-Whisper transcription
-- **Faster-Whisper**: Local transcription library (`pip install faster-whisper`)
+- **Python 3.8+**: For local Faster-Whisper transcription (virtual environment required)
+- **ffmpeg**: Audio processing library (usually pre-installed or available via package managers)
 - **OpenAI API Key**: For transcription text optimization and AI summarization
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone <https://github.com/wendy7756/podcast-transcriber>
-cd podcast-to-text
+git clone <https://github.com/wendy7756/
+podcast-transcriber>
+cd podcast-transcriber
 
 # Install Node.js dependencies
 npm install
 
+# Create Python virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate  # Linux/macOS
+# or venv\Scripts\activate  # Windows
+
 # Install Python dependencies (local transcription)
+pip install --upgrade pip
 pip install faster-whisper
 
 # Configure environment
@@ -142,6 +149,16 @@ npm run dev
 open http://localhost:3000
 ```
 
+### ⚠️ Important Notes
+
+**Python Virtual Environment Setup**: The project requires a Python virtual environment named `venv` in the project root directory. This is essential because the Node.js server calls `./venv/bin/python` to execute transcription scripts.
+
+If you encounter errors like `/bin/sh: .../venv/bin/python: No such file or directory`, please ensure:
+
+1. Create the virtual environment in the project root: `python3 -m venv venv`
+2. Activate the virtual environment: `source venv/bin/activate`
+3. Install dependencies in the virtual environment: `pip install faster-whisper`
+
 ### Configuration
 
 Create a `.env` file with the following variables:
@@ -149,8 +166,7 @@ Create a `.env` file with the following variables:
 ```env
 # OpenAI Configuration (for text optimization and summarization only)
 OPENAI_API_KEY=your_openai_api_key_here
-# Optional: custom OpenAI base URL (compatible endpoint)
-OPENAI_BASE_URL=https://api.openai.com/v1
+# Optional: custom OpenAI URL (compatible endpoint)
 
 # Local Whisper Configuration
 USE_LOCAL_WHISPER=true
@@ -159,9 +175,54 @@ WHISPER_MODEL=base
 # Server Configuration
 PORT=3000
 
-# Optional: File size limit
-MAX_FILE_SIZE=500
+# Optional: Audio processing configuration
+MAX_SEGMENT_SIZE_MB=25
+SEGMENT_DURATION_SECONDS=600
 ```
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**Q: Getting `No such file or directory: .../venv/bin/python` error**
+
+A: This indicates that the Python virtual environment is not properly created. Follow these steps:
+
+```bash
+# Ensure you're in the project root directory
+cd /path/to/podcast-transcriber
+
+# Remove any existing incorrect virtual environment
+rm -rf venv
+
+# Create a new virtual environment
+python3 -m venv venv
+
+# Activate the virtual environment
+source venv/bin/activate
+
+# Verify Python path
+which python  # Should show .../venv/bin/python
+
+# Install dependencies
+pip install --upgrade pip
+pip install faster-whisper
+
+# Restart the server
+npm start
+```
+
+**Q: Transcription function not responding or showing errors**
+
+A: Ensure that:
+1. Virtual environment is properly created and activated
+2. `faster-whisper` is installed in the virtual environment
+3. System has sufficient memory (recommend at least 4GB available)
+4. ffmpeg is installed (check with `which ffmpeg`)
+
+**Q: First transcription is very slow**
+
+A: This is normal behavior. Faster-Whisper needs to download model files (~75MB) on first run. Subsequent transcriptions will be much faster.
 
 ## 🔧 Advanced Features
 

@@ -7,24 +7,37 @@ const { promisify } = require('util');
 const execAsync = promisify(exec);
 
 /**
+ * 生成标准化的文件名
+ * @param {string} type - 文件类型 (raw, transcript, summary, translation)
+ * @param {string} title - 播客标题
+ * @returns {string} - 标准化的文件前缀
+ */
+function generateFilePrefix(type, title) {
+    // 清理标题，保留重要标点符号，将特殊符号转换为文件名安全字符
+    let cleanTitle = title
+        .replace(/\s*\|\s*/g, '-')  // | 转换为 -
+        .replace(/\s*:\s*/g, '-')  // : 转换为 -
+        .replace(/[<>:"/\\|?*]/g, '')  // 移除文件名非法字符
+        .replace(/\s+/g, '_')  // 空格转换为下划线
+        .replace(/[^\w\u4e00-\u9fa5\-_.]/g, '');  // 只保留字母数字中文和安全符号zhe
+    
+    // 如果太长则保留前30个字符以保证文件名简洁
+    if (cleanTitle.length > 30) {
+        cleanTitle = cleanTitle.substring(0, 30);
+    }
+    
+    // 生成6位UUID
+    const uuid = Math.random().toString(36).substr(2, 6).toUpperCase();
+    
+    return `${type}_${cleanTitle}_${uuid}`;
+}
+
+/**
  * 将翻译内容格式化为Markdown
  */
-function formatTranslationAsMarkdown(translatedText, audioFilePath, targetLanguage = 'zh', sourceUrl = null) {
-    const audioName = audioFilePath ? path.basename(audioFilePath, path.extname(audioFilePath)) : '';
-    
-    // 多语言标题
-    const titles = {
-        zh: '# 🌍 Podcast翻译',
-        en: '# 🌍 Podcast Translation',
-        es: '# 🌍 Traducción del Podcast',
-        fr: '# 🌍 Traduction du Podcast',
-        de: '# 🌍 Podcast-Übersetzung'
-    };
-    
-    const title = titles[targetLanguage] || titles.en;
-    
-    // 如果有音频名称，使用具体名称；否则用通用标题
-    const finalTitle = audioName ? `# 🌍 ${audioName}` : title;
+function formatTranslationAsMarkdown(translatedText, podcastTitle, targetLanguage = 'zh', sourceUrl = null) {
+    // 使用播客实际标题，而不是文件名
+    const finalTitle = podcastTitle ? `# 🌍 ${podcastTitle}` : `# 🌍 Podcast Translation`;
     
     // 添加source链接（如果提供）
     const sourceSection = sourceUrl ? `\n\n---\n\n**Source:** ${sourceUrl}` : '';
@@ -38,22 +51,9 @@ ${translatedText}${sourceSection}
 /**
  * 将总结格式化为Markdown - 简洁版本
  */
-function formatSummaryAsMarkdown(summary, audioFilePath, outputLanguage = 'zh', sourceUrl = null) {
-    const audioName = audioFilePath ? path.basename(audioFilePath, path.extname(audioFilePath)) : '';
-    
-    // 多语言标题
-    const titles = {
-        zh: '# 🎙️ Podcast总结',
-        en: '# 🎙️ Podcast Summary',
-        es: '# 🎙️ Resumen del Podcast',
-        fr: '# 🎙️ Résumé du Podcast',
-        de: '# 🎙️ Podcast-Zusammenfassung'
-    };
-    
-    const title = titles[outputLanguage] || titles.en;
-    
-    // 如果有音频名称，使用具体名称；否则用通用标题
-    const finalTitle = audioName ? `# 🎙️ ${audioName}` : title;
+function formatSummaryAsMarkdown(summary, podcastTitle, outputLanguage = 'zh', sourceUrl = null) {
+    // 使用播客实际标题，而不是文件名
+    const finalTitle = podcastTitle ? `# 🎙️ ${podcastTitle}` : `# 🎙️ Podcast Summary`;
     
     // 添加source链接（如果提供）
     const sourceSection = sourceUrl ? `\n\n---\n\n**Source:** ${sourceUrl}` : '';
@@ -83,7 +83,7 @@ const openai = new OpenAI({
  * @param {string} outputLanguage - 输出语言
  * @returns {Promise<Object>} - 处理结果
  */
-async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outputLanguage = 'zh', tempDir = null, audioLanguage = 'auto', originalUrl = null, sessionId = null, sendProgressCallback = null) {
+async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outputLanguage = 'zh', tempDir = null, audioLanguage = 'auto', originalUrl = null, sessionId = null, sendProgressCallback = null, podcastTitle = null) {
     try {
         console.log(`🤖 开始音频处理 - OpenAI`);
         
@@ -100,10 +100,9 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
             
             // Python脚本转录并直接保存转录文本
             const scriptPath = path.join(__dirname, '..', 'whisper_transcribe.py');
-            const timestamp = Date.now();
-            const filePrefix = `podcast_${timestamp}`;
+            const filePrefix = generateFilePrefix('raw', podcastTitle || 'Untitled');
             const venvPython = path.join(__dirname, '..', '..', 'venv', 'bin', 'python');
-            const command = `"${venvPython}" "${scriptPath}" "${files[0]}" --model ${process.env.WHISPER_MODEL || 'base'} --save-transcript "${tempDir}" --file-prefix "${filePrefix}"`;
+            const command = `"${venvPython}" "${scriptPath}" "${files[0]}" --model ${process.env.WHISPER_MODEL || 'base'} --save-transcript "${tempDir}" --file-prefix "${filePrefix}" --podcast-title "${podcastTitle || 'Untitled'}" --source-url "${originalUrl || ''}"`;
             
             console.log(`🎤 Python脚本转录并保存: ${path.basename(files[0])}`);
             console.log(`⚙️ 执行命令: ${command}`);
@@ -202,9 +201,10 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
                 const summary = await generateSummary(transcript, outputLanguage);
                 
                 // 保存AI总结（Markdown格式）
-                const summaryFileName = `${filePrefix}_summary.md`;
+                const summaryPrefix = generateFilePrefix('summary', podcastTitle || 'Untitled');
+                const summaryFileName = `${summaryPrefix}.md`;
                 const summaryPath = path.join(tempDir, summaryFileName);
-                const markdownSummary = formatSummaryAsMarkdown(summary, files[0], outputLanguage, originalUrl);
+                const markdownSummary = formatSummaryAsMarkdown(summary, podcastTitle, outputLanguage, originalUrl);
                 fs.writeFileSync(summaryPath, markdownSummary, 'utf8');
                 
                 savedFiles.push({
@@ -228,9 +228,10 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
                     const translatedTranscript = await translateTranscript(transcript, result.detectedLanguage, outputLanguage);
                     
                     // 保存翻译结果（Markdown格式）
-                    const translationFileName = `${filePrefix}_translation.md`;
+                    const translationPrefix = generateFilePrefix('translation', podcastTitle || 'Untitled');
+                    const translationFileName = `${translationPrefix}.md`;
                     const translationPath = path.join(tempDir, translationFileName);
-                    const markdownTranslation = formatTranslationAsMarkdown(translatedTranscript, files[0], outputLanguage, originalUrl);
+                    const markdownTranslation = formatTranslationAsMarkdown(translatedTranscript, podcastTitle, outputLanguage, originalUrl);
                     fs.writeFileSync(translationPath, markdownTranslation, 'utf8');
                     
                     savedFiles.push({

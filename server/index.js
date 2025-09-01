@@ -121,14 +121,17 @@ app.post('/api/process-podcast', async (req, res) => {
             sendProgress(sessionId, 10, 'download', stageText);
         }
         
-        const originalAudioPath = await downloadPodcastAudio(url);
+        const podcastInfo = await downloadPodcastAudio(url);
         
-        if (!originalAudioPath) {
+        if (!podcastInfo || !podcastInfo.audioFilePath) {
             return res.status(400).json({
                 success: false,
                 error: '无法下载音频文件，请检查链接是否有效 / Unable to download audio file, please check if the link is valid'
             });
         }
+
+        const originalAudioPath = podcastInfo.audioFilePath;
+        const podcastTitle = podcastInfo.title || 'Untitled Podcast';
 
         // 步骤2: 基于文件大小估算时长（用于初始预估）
         console.log('📊 估算音频时长...');
@@ -154,7 +157,7 @@ app.post('/api/process-podcast', async (req, res) => {
             sendProgress(sessionId, 30, 'transcription', stageText);
         }
         
-        const result = await processAudioWithOpenAI(audioFiles, shouldSummarize, outputLanguage, tempDir, audioLanguage, url, sessionId, sendProgress);
+        const result = await processAudioWithOpenAI(audioFiles, shouldSummarize, outputLanguage, tempDir, audioLanguage, url, sessionId, sendProgress, podcastTitle);
 
         // 步骤4: 获取保存的文件信息
         const savedFiles = result.savedFiles || [];
@@ -179,6 +182,7 @@ app.post('/api/process-podcast', async (req, res) => {
             success: true,
             data: {
                 ...result,
+                podcastTitle: podcastTitle, // 播客标题
                 estimatedDuration: estimatedDuration, // 估算时长（秒）
                 actualDuration: result.audioDuration || result.duration, // 从Whisper获取的真实时长
                 savedFiles: savedFiles

@@ -109,21 +109,28 @@ podcast-to-text/
 ### 环境要求
 
 - **Node.js 16+**：运行时环境
-- **Python 3.8+**：用于本地Faster-Whisper转录
-- **Faster-Whisper**：本地转录库（`pip install faster-whisper`）
+- **Python 3.8+**：用于本地Faster-Whisper转录（必须创建虚拟环境）
+- **ffmpeg**：音频处理库（通常已预装或可通过包管理器安装）
 - **OpenAI API密钥**：用于转录文本优化和AI总结
 
 ### 安装步骤
 
 ```bash
 # 克隆仓库
-git clone <https://github.com/wendy7756/podcast-to-text>
-cd podcast-to-text
+git clone <https://github.com/wendy7756/
+podcast-transcriber>
+cd podcast-transcriber
 
 # 安装Node.js依赖
 npm install
 
+# 创建Python虚拟环境（推荐）
+python3 -m venv venv
+source venv/bin/activate  # Linux/macOS
+# 或 venv\Scripts\activate  # Windows
+
 # 安装Python依赖（本地转录）
+pip install --upgrade pip
 pip install faster-whisper
 
 # 配置环境
@@ -139,6 +146,16 @@ npm run dev
 open http://localhost:3000
 ```
 
+### ⚠️ 重要提示
+
+**Python虚拟环境配置**：项目需要在项目根目录下创建名为 `venv` 的Python虚拟环境。这是必需的，因为Node.js服务器会调用 `./venv/bin/python` 来执行转录脚本。
+
+如果您遇到类似 `/bin/sh: .../venv/bin/python: No such file or directory` 的错误，请确保：
+
+1. 在项目根目录下创建了虚拟环境：`python3 -m venv venv`
+2. 激活虚拟环境：`source venv/bin/activate`
+3. 在虚拟环境中安装了依赖：`pip install faster-whisper`
+
 ### 配置说明
 
 创建`.env`文件，包含以下变量：
@@ -146,8 +163,7 @@ open http://localhost:3000
 ```env
 # OpenAI 配置（仅用于文本优化和总结）
 OPENAI_API_KEY=your_openai_api_key_here
-# 可选：自定义OpenAI Base URL（兼容端点）
-OPENAI_BASE_URL=https://api.openai.com/v1
+# 可选：自定义OpenAI URL（兼容端点）
 
 # 本地Whisper配置
 USE_LOCAL_WHISPER=true
@@ -156,9 +172,54 @@ WHISPER_MODEL=base
 # 服务器配置
 PORT=3000
 
-# 可选：文件大小限制
-MAX_FILE_SIZE=500
+# 可选：音频处理配置
+MAX_SEGMENT_SIZE_MB=25
+SEGMENT_DURATION_SECONDS=600
 ```
+
+## 🔧 故障排除
+
+### 常见问题
+
+**Q: 遇到 `No such file or directory: .../venv/bin/python` 错误**
+
+A: 这表示Python虚拟环境未正确创建。请执行以下步骤：
+
+```bash
+# 确保在项目根目录
+cd /path/to/podcast-transcriber
+
+# 删除可能存在的错误虚拟环境
+rm -rf venv
+
+# 重新创建虚拟环境
+python3 -m venv venv
+
+# 激活虚拟环境
+source venv/bin/activate
+
+# 确认Python路径
+which python  # 应该显示 .../venv/bin/python
+
+# 安装依赖
+pip install --upgrade pip
+pip install faster-whisper
+
+# 重启服务器
+npm start
+```
+
+**Q: 转录功能无响应或报错**
+
+A: 确保：
+1. 虚拟环境已正确创建和激活
+2. `faster-whisper` 已在虚拟环境中安装
+3. 系统有足够的内存（建议至少4GB可用内存）
+4. ffmpeg已安装（`which ffmpeg` 检查）
+
+**Q: 首次转录速度很慢**
+
+A: 这是正常现象。Faster-Whisper首次运行时需要下载模型文件（约75MB），后续转录会明显加快。
 
 ## 🔧 高级特性
 
