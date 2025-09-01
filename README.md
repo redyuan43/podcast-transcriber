@@ -18,7 +18,7 @@ Podcast Transcriber is a full-stack web application designed to bridge the gap b
 
 - **🔗 Multi-Platform Support**: Support for Apple Podcasts, Xiaoyuzhoufm, RSS feeds, and direct audio URLs
 - **🚀 Performance First**: Using OpenAI Faster-Whisper model for speech-to-text
-- **🤖 AI Intelligent Optimization**: AI-optimized transcription and summary text based on podcast content characteristics
+- **🤖 AI Optimization**: AI-optimized transcription and summary text based on podcast content characteristics
 - **📱 Responsive Design**: Modern mobile-first UI, friendly experience for both desktop and mobile
 - **🌍 Conditional Translation**: When the selected summary language differs from the detected transcript language, the system auto-translates with GPT‑4o
 
