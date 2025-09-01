@@ -220,6 +220,35 @@ A: Ensure that:
 3. System has sufficient memory (recommend at least 4GB available)
 4. ffmpeg is installed (check with `which ffmpeg`)
 
+**Q: 500 Internal Server Error**
+
+In most cases, HTTP 500 is not a network issue but a local Python virtual environment problem (missing `venv` or dependencies). Heuristic: if the podcast link opens fine in your browser, it’s unlikely a network issue.
+
+Quick checklist:
+
+```bash
+# 1) Ensure you're at the project root
+cd /path/to/podcast-transcriber
+
+# 2) Recreate the virtual environment
+rm -rf venv
+python3 -m venv venv
+source venv/bin/activate
+
+# 3) Install dependencies
+pip install --upgrade pip
+pip install faster-whisper
+
+# 4) Verify python path and ffmpeg
+which python     # should be .../podcast-transcriber/venv/bin/python
+which ffmpeg     # should point to a valid executable
+
+# 5) Restart the server
+npm start
+```
+
+If the problem persists, copy the terminal stack trace and open an issue with the logs attached.
+
 **Q: First transcription is very slow**
 
 A: This is normal behavior. Faster-Whisper needs to download model files (~75MB) on first run. Subsequent transcriptions will be much faster.

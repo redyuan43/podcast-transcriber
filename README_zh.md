@@ -217,6 +217,35 @@ A: 确保：
 3. 系统有足够的内存（建议至少4GB可用内存）
 4. ffmpeg已安装（`which ffmpeg` 检查）
 
+**Q: 500 内部服务器错误**
+
+多数 500 报错并非网络问题，而是本地 Python 虚拟环境未正确创建或依赖缺失导致。判断原则：如果播客链接能在浏览器直接打开，基本可排除网络问题。
+
+快速排查步骤：
+
+```bash
+# 1) 确认在项目根目录
+cd /path/to/podcast-transcriber
+
+# 2) 重新创建虚拟环境
+rm -rf venv
+python3 -m venv venv
+source venv/bin/activate
+
+# 3) 安装依赖
+pip install --upgrade pip
+pip install faster-whisper
+
+# 4) 验证python路径与ffmpeg
+which python     # 应显示 .../podcast-transcriber/venv/bin/python
+which ffmpeg     # 应有可执行路径
+
+# 5) 重启服务器
+npm start
+```
+
+若问题依旧，请查看终端日志的详细错误堆栈并附带日志提Issue。
+
 **Q: 首次转录速度很慢**
 
 A: 这是正常现象。Faster-Whisper首次运行时需要下载模型文件（约75MB），后续转录会明显加快。
