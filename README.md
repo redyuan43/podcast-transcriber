@@ -6,7 +6,9 @@ English | [中文](README_zh.md)
 
 An open-source tool that turns podcasts into high-quality transcripts and AI-powered summaries.
 
-![Podcast Transcriber Interface](public/podcast_en.jpeg)
+![Podcast Transcriber Interface](public/Screenshot%202025-09-02%20183937.png)
+![Timeline View](public/Screenshot%202025-09-02%20234235.png)
+![Speaker Segmentation](public/Screenshot%202025-09-02%20234242.png)
 
 </div>
 
