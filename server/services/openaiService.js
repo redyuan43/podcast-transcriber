@@ -69,12 +69,20 @@ const WHISPER_MODEL = process.env.WHISPER_MODEL || 'base'; // Whisper模型大�
 console.log(`🎤 转录模式: 本地Faster-Whisper`);
 
 // 初始化OpenAI客户端（用于总结和文本优化）
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
-    timeout: 900000,
-    maxRetries: 0
-});
+let openai = null;
+const hasValidApiKey = process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here';
+
+if (hasValidApiKey) {
+    openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+        baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+        timeout: 900000,
+        maxRetries: 0
+    });
+    console.log('🤖 OpenAI客户端已初始化 (AI优化和总结功能可用)');
+} else {
+    console.log('⚠️ OpenAI API密钥未配置，仅支持基础转录功能 (无AI优化和总结)');
+}
 
 /**
  * 处理音频文件（单个或多个片段）
@@ -98,13 +106,23 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
             // 单文件处理 - Python脚本总是保存转录文本
             console.log(`🎵 单文件处理模式`);
             
-            // Python脚本转录并直接保存转录文本
-            const scriptPath = path.join(__dirname, '..', 'whisper_transcribe.py');
+            // Python脚本转录并直接保存转录文本 - 支持增强模式
+            const useEnhanced = process.env.USE_ENHANCED_TRANSCRIPTION !== 'false'; // 默认启用增强模式
+            const scriptPath = useEnhanced 
+                ? path.join(__dirname, '..', 'enhanced_whisper_transcribe.py')
+                : path.join(__dirname, '..', 'whisper_transcribe.py');
+            
             const filePrefix = generateFilePrefix('raw', podcastTitle || 'Untitled');
             const venvPython = path.join(__dirname, '..', '..', 'venv', 'bin', 'python');
-            const command = `"${venvPython}" "${scriptPath}" "${files[0]}" --model ${process.env.WHISPER_MODEL || 'base'} --save-transcript "${tempDir}" --file-prefix "${filePrefix}" --podcast-title "${podcastTitle || 'Untitled'}" --source-url "${originalUrl || ''}"`;
             
-            console.log(`🎤 Python脚本转录并保存: ${path.basename(files[0])}`);
+            let command = `"${venvPython}" "${scriptPath}" "${files[0]}" --model ${process.env.WHISPER_MODEL || 'base'} --save-transcript "${tempDir}" --file-prefix "${filePrefix}" --podcast-title "${podcastTitle || 'Untitled'}" --source-url "${originalUrl || ''}"`;
+            
+            if (useEnhanced) {
+                command += ' --enhanced'; // 启用增强功能
+                console.log(`🎤 Python增强脚本转录并保存: ${path.basename(files[0])} (说话人分离+情绪检测)`);
+            } else {
+                console.log(`🎤 Python脚本转录并保存: ${path.basename(files[0])}`);
+            }
             console.log(`⚙️ 执行命令: ${command}`);
             
             const { stdout, stderr } = await execAsync(command, {
@@ -542,6 +560,11 @@ async function formatTranscriptText(rawTranscript, transcriptLanguage = 'zh') {
     try {
         console.log(`📝 开始智能优化转录文本: ${rawTranscript.length} 字符 (修正错误 + 格式化)`);
 
+        if (!openai) {
+            console.log('⚠️ OpenAI未配置，跳过转录文本优化');
+            return rawTranscript;
+        }
+
         // 检查文本长度，超过限制时分块处理
         const maxCharsPerChunk = 4000; // 约2000-4000 tokens，适合GPT-3.5/GPT-4
         
@@ -714,6 +737,11 @@ Please output the optimized text directly in the original language without any e
 async function generateSummary(transcript, outputLanguage = 'zh') {
     try {
         console.log(`📋 生成总结 (${outputLanguage})...`);
+        
+        if (!openai) {
+            console.log('⚠️ OpenAI未配置，跳过AI总结功能');
+            return null;
+        }
         
         // 智能处理不同长度的文本
         // 考虑token限制：GPT-4约8000 tokens，中文1-2字符=1token，安全起见用6000字符

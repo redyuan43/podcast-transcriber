@@ -346,7 +346,19 @@ async function extractXiaoyuzhouAudio(url) {
             if (ogAudioMatch) {
                 const audioUrl = ogAudioMatch[1];
                 console.log('从小宇宙网页og:audio成功获取到音频链接');
-                return audioUrl;
+                
+                // 提取标题
+                let title = 'Untitled Episode';
+                const titleMatch = pageResponse.data.match(/<meta\s+property="og:title"\s+content="([^"]+)"/);
+                if (titleMatch) {
+                    title = titleMatch[1];
+                }
+                
+                return {
+                    audioUrl: audioUrl,
+                    title: title,
+                    description: ''
+                };
             }
             
             // 备用方案：从JSON-LD结构化数据提取
@@ -354,7 +366,19 @@ async function extractXiaoyuzhouAudio(url) {
             if (jsonLdMatch) {
                 const audioUrl = jsonLdMatch[1];
                 console.log('从小宇宙JSON-LD数据获取到音频链接');
-                return audioUrl;
+                
+                // 提取标题
+                let title = 'Untitled Episode';
+                const titleMatch = pageResponse.data.match(/<meta\s+property="og:title"\s+content="([^"]+)"/);
+                if (titleMatch) {
+                    title = titleMatch[1];
+                }
+                
+                return {
+                    audioUrl: audioUrl,
+                    title: title,
+                    description: ''
+                };
             }
             
         } catch (pageError) {
@@ -368,7 +392,11 @@ async function extractXiaoyuzhouAudio(url) {
                 const audioItems = await parseRSSFeed(rssUrl);
                 if (audioItems && audioItems.length > 0) {
                     console.log('从小宇宙RSS获取到音频链接');
-                    return audioItems[0].audioUrl; // 返回第一个音频项目
+                    return {
+                        audioUrl: audioItems[0].audioUrl,
+                        title: audioItems[0].title || 'Untitled Episode',
+                        description: audioItems[0].description || ''
+                    };
                 }
             }
         } catch (rssError) {
@@ -382,7 +410,11 @@ async function extractXiaoyuzhouAudio(url) {
                 const audioItems = await parseRSSFeed(discoveredRSS);
                 if (audioItems && audioItems.length > 0) {
                     console.log('从发现的RSS获取到音频链接');
-                    return audioItems[0].audioUrl;
+                    return {
+                        audioUrl: audioItems[0].audioUrl,
+                        title: audioItems[0].title || 'Untitled Episode',
+                        description: audioItems[0].description || ''
+                    };
                 }
             }
         } catch (discoverError) {
@@ -412,7 +444,11 @@ async function extractGenericPodcastAudio(url) {
                 const audioItems = await parseRSSFeed(url);
                 if (audioItems && audioItems.length > 0) {
                     console.log('从RSS feed获取到音频链接');
-                    return audioItems[0].audioUrl;
+                    return {
+                        audioUrl: audioItems[0].audioUrl,
+                        title: audioItems[0].title || 'Untitled Episode',
+                        description: audioItems[0].description || ''
+                    };
                 }
             } catch (rssError) {
                 console.log('直接RSS解析失败:', rssError.message);
@@ -433,7 +469,11 @@ async function extractGenericPodcastAudio(url) {
                 console.log('响应内容是RSS，解析...');
                 const audioItems = await parseRSSFeed(url);
                 if (audioItems && audioItems.length > 0) {
-                    return audioItems[0].audioUrl;
+                    return {
+                        audioUrl: audioItems[0].audioUrl,
+                        title: audioItems[0].title || 'Untitled Episode',
+                        description: audioItems[0].description || ''
+                    };
                 }
             } catch (xmlError) {
                 console.log('XML解析失败:', xmlError.message);
@@ -452,7 +492,11 @@ async function extractGenericPodcastAudio(url) {
             const match = response.data.match(pattern);
             if (match) {
                 console.log('从页面HTML中找到音频链接');
-                return match[1];
+                return {
+                    audioUrl: match[1],
+                    title: 'Untitled Episode',
+                    description: ''
+                };
             }
         }
 
@@ -463,7 +507,11 @@ async function extractGenericPodcastAudio(url) {
                 console.log('发现RSS feed，解析...');
                 const audioItems = await parseRSSFeed(discoveredRSS);
                 if (audioItems && audioItems.length > 0) {
-                    return audioItems[0].audioUrl;
+                    return {
+                        audioUrl: audioItems[0].audioUrl,
+                        title: audioItems[0].title || 'Untitled Episode',
+                        description: audioItems[0].description || ''
+                    };
                 }
             }
         } catch (discoverError) {
