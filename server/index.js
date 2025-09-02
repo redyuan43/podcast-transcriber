@@ -161,6 +161,19 @@ app.post('/api/process-podcast', async (req, res) => {
 
         // 步骤4: 获取保存的文件信息
         const savedFiles = result.savedFiles || [];
+        
+        // 添加音频文件到savedFiles中（用于播放器）
+        if (originalAudioPath && fs.existsSync(originalAudioPath)) {
+            const audioFilename = path.basename(originalAudioPath);
+            const audioStats = fs.statSync(originalAudioPath);
+            savedFiles.push({
+                type: 'audio',
+                filename: audioFilename,
+                path: originalAudioPath,
+                size: audioStats.size
+            });
+        }
+        
         console.log(`✅ 处理完成，共保存 ${savedFiles.length} 个文件`);
         
         // 打印保存的文件详情
@@ -185,7 +198,9 @@ app.post('/api/process-podcast', async (req, res) => {
                 podcastTitle: podcastTitle, // 播客标题
                 estimatedDuration: estimatedDuration, // 估算时长（秒）
                 actualDuration: result.audioDuration || result.duration, // 从Whisper获取的真实时长
-                savedFiles: savedFiles
+                savedFiles: savedFiles,
+                // 添加结构化分析数据（如果有AI分析）
+                analysisData: result.analysisData || null
             }
         });
 
@@ -202,7 +217,7 @@ app.post('/api/process-podcast', async (req, res) => {
 // 本地文件处理端点
 app.post('/api/process-local-file', async (req, res) => {
     try {
-        const { filename, operation = 'transcribe_only', outputLanguage = 'zh' } = req.body;
+        const { filename, operation = 'transcribe_only', outputLanguage = 'zh', audioLanguage = 'auto' } = req.body;
         
         if (!filename) {
             return res.status(400).json({
@@ -240,6 +255,19 @@ app.post('/api/process-local-file', async (req, res) => {
 
         // 获取保存的文件信息
         const savedFiles = result.savedFiles || [];
+        
+        // 添加音频文件到savedFiles中（用于播放器）
+        if (filePath && fs.existsSync(filePath)) {
+            const audioFilename = path.basename(filePath);
+            const audioStats = fs.statSync(filePath);
+            savedFiles.push({
+                type: 'audio',
+                filename: audioFilename,
+                path: filePath,
+                size: audioStats.size
+            });
+        }
+        
         console.log(`✅ 处理完成，共保存 ${savedFiles.length} 个文件`);
         
         // 打印保存的文件详情
@@ -325,9 +353,28 @@ app.get('/api/download/:filename', (req, res) => {
             });
         }
 
-        // 设置下载响应头
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        // 设置响应头（根据文件类型）
+        const ext = path.extname(filename).toLowerCase();
+        let contentType = 'application/octet-stream';
+        let disposition = 'attachment';
+        
+        if (['.mp3'].includes(ext)) {
+            contentType = 'audio/mpeg';
+            disposition = 'inline'; // 允许浏览器内播放
+        } else if (['.m4a', '.mp4'].includes(ext)) {
+            contentType = 'audio/mp4';
+            disposition = 'inline';
+        } else if (['.wav'].includes(ext)) {
+            contentType = 'audio/wav';
+            disposition = 'inline';
+        } else if (['.md'].includes(ext)) {
+            contentType = 'text/markdown; charset=utf-8';
+        } else if (['.txt'].includes(ext)) {
+            contentType = 'text/plain; charset=utf-8';
+        }
+        
+        res.setHeader('Content-Disposition', `${disposition}; filename="${filename}"`);
+        res.setHeader('Content-Type', contentType);
 
         // 发送文件
         res.sendFile(filePath);

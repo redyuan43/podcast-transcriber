@@ -319,6 +319,59 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
                     console.error('❌ AI内容分析失败:', analysisError.message);
                 }
             }
+            
+            // 生成基于speaker的章节分析（如果有enhanced数据）
+            let speakerChapters = null;
+            if (result.enhanced && result.speakers && result.segments) {
+                try {
+                    const speakerChapteringService = require('./speakerChapteringService');
+                    speakerChapters = await speakerChapteringService.generateSpeakerChapters({
+                        segments: result.segments,
+                        speakers: result.speakers
+                    });
+                    console.log(`🎭 Speaker章节分析完成: ${speakerChapters?.totalSegments || 0}个段落`);
+                } catch (error) {
+                    console.error('❌ Speaker章节分析失败:', error.message);
+                }
+            }
+            
+            // 生成结构化分析数据（用于前端展示）
+            let analysisData = null;
+            if (analysisResult && analysisResult.success) {
+                const contentAnalysisService = require('./contentAnalysisService');
+                analysisData = contentAnalysisService.generateAnalysisReport(analysisResult, {
+                    title: podcastTitle || 'Untitled',
+                    source: originalUrl
+                });
+                
+                // 如果有speaker章节数据，替换原来的chapters
+                if (speakerChapters && speakerChapters.success) {
+                    analysisData.chapters = speakerChapters.chapters.map((chapter, index) => ({
+                        index: index + 1,
+                        title: `${chapter.speaker} - 段落${index + 1}`,
+                        timeRange: chapter.timeRange,
+                        summary: chapter.summary,
+                        speaker: chapter.speaker,
+                        position: chapter.position,
+                        startTime: chapter.startTime,
+                        endTime: chapter.endTime,
+                        duration: chapter.duration,
+                        segmentCount: chapter.segmentCount,
+                        keywords: [], // 可以后续添加
+                        hotwords: [], // 可以后续添加
+                        professionalDensity: 0
+                    }));
+                    
+                    // 更新统计信息
+                    if (analysisData.insights) {
+                        analysisData.insights.push({
+                            type: 'speakers',
+                            message: `检测到${speakerChapters.statistics.speakerCount}个说话人，共${speakerChapters.totalSegments}个对话段落`
+                        });
+                    }
+                }
+            }
+            
             // 返回处理后的结果
             return {
                 transcript: transcript,
@@ -329,7 +382,8 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
                 needsTranslation: result.needsTranslation || false,
                 audioDuration: result.audioDuration, // 从Whisper获取的真实音频时长
                 savedFiles: savedFiles,
-                analysis: analysisResult // AI内容分析结果
+                analysis: analysisResult, // AI内容分析结果（原始数据）
+                analysisData: analysisData // 结构化分析数据（前端用）
             };
             
         } else {

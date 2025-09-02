@@ -773,11 +773,28 @@ function showResultsContent(data, operation = 'transcribe_only') {
         console.log('✅ 无需显示翻译');
     }
     
+    // 章节目录标签（如果有AI分析数据）
+    if (data.analysisData && data.analysisData.chapters && data.analysisData.chapters.length > 0) {
+        tabs.push({
+            id: 'chapters',
+            icon: '📚',
+            title: currentLang === 'zh' ? '章节目录' : 'Chapters',
+            content: null, // 章节内容通过特殊方式渲染
+            contentId: 'chaptersTabContent'
+        });
+        console.log('📚 显示章节目录，共 ' + data.analysisData.chapters.length + ' 个章节');
+    }
+    
     // 创建标签页导航
     createTabNavigation(tabs);
     
     // 填充标签页内容
-    populateTabContent(tabs);
+    populateTabContent(tabs, data.analysisData);
+    
+    // 渲染章节内容（如果有）
+    if (data.analysisData && data.analysisData.chapters) {
+        populateChaptersContent(data.analysisData.chapters, data.analysisData.metadata);
+    }
     
     // 激活第一个标签页
     if (tabs.length > 0) {
@@ -786,6 +803,21 @@ function showResultsContent(data, operation = 'transcribe_only') {
     
     // 显示下载按钮（如果有保存的文件）
     showDownloadButtons(data.savedFiles || []);
+    
+    // 设置音频播放器（查找音频文件）
+    console.log('🎵 所有保存的文件:', data.savedFiles);
+    const audioFile = (data.savedFiles || []).find(file => 
+        file.filename && (file.filename.includes('.mp3') || file.filename.includes('.m4a') || file.filename.includes('.wav'))
+    );
+    if (audioFile) {
+        const audioUrl = `/api/download/${audioFile.filename}`;
+        setupAudioPlayer(audioUrl);
+        console.log('🎵 找到音频文件，设置播放器:', audioFile.filename);
+        console.log('🎵 音频URL:', audioUrl);
+    } else {
+        console.log('🎵 未找到音频文件，播放器不可用');
+        console.log('🎵 savedFiles详情:', data.savedFiles?.map(f => ({type: f.type, filename: f.filename})));
+    }
     
     // 重新启用提交按钮
     const submitBtn = document.getElementById('submitBtn');
@@ -1006,13 +1038,28 @@ function createTabNavigation(tabs) {
     });
 }
 
-function populateTabContent(tabs) {
+function populateTabContent(tabs, analysisData = null) {
     tabs.forEach(tab => {
         const contentElement = document.getElementById(tab.contentId);
         if (contentElement) {
             const textElement = contentElement.querySelector('.prose');
-            if (textElement) {
-                textElement.innerHTML = marked.parse(tab.content);
+            if (textElement && tab.content) {
+                let processedContent = marked.parse(tab.content);
+                
+                // 如果是转录标签页且有分析数据，则高亮热词并添加索引
+                if (tab.id === 'transcript' && analysisData && analysisData.professionalTerms) {
+                    processedContent = highlightHotwords(processedContent, analysisData.professionalTerms);
+                    
+                    // 添加热词索引面板
+                    const hotwordsIndex = createHotwordsIndex(analysisData.professionalTerms);
+                    if (hotwordsIndex) {
+                        // 将热词索引插入到转录内容之前
+                        const container = textElement.parentElement;
+                        container.insertBefore(hotwordsIndex, textElement);
+                    }
+                }
+                
+                textElement.innerHTML = processedContent;
             }
         }
     });
@@ -1077,4 +1124,450 @@ function updateProgressDisplay() {
     if (smartProgressBar) {
         smartProgressBar.updateProgressDisplay(smartProgressBar.currentProgress);
     }
+}
+
+// ========================================
+// 章节目录相关函数
+// ========================================
+
+// 渲染Speaker时间轴内容
+function populateChaptersContent(chapters, metadata) {
+    const speakerSegments = document.getElementById('speakerSegments');
+    const noChaptersMessage = document.getElementById('noChaptersMessage');
+    const timelineStats = document.getElementById('timelineStats');
+    const leftSpeakerLabel = document.getElementById('leftSpeakerLabel');
+    const rightSpeakerLabel = document.getElementById('rightSpeakerLabel');
+    
+    if (!chapters || chapters.length === 0) {
+        speakerSegments.innerHTML = '';
+        noChaptersMessage.classList.remove('hidden');
+        return;
+    }
+    
+    noChaptersMessage.classList.add('hidden');
+    speakerSegments.innerHTML = '';
+    
+    // 更新统计信息
+    const speakers = [...new Set(chapters.map(ch => ch.speaker))];
+    timelineStats.textContent = `共 ${chapters.length} 个对话段落`;
+    
+    // 更新说话人标签
+    if (speakers.length >= 2) {
+        leftSpeakerLabel.textContent = speakers[0] || '主持人';
+        rightSpeakerLabel.textContent = speakers[1] || '嘉宾';
+    }
+    
+    // 创建时间轴段落
+    chapters.forEach((chapter, index) => {
+        const segmentElement = createSpeakerSegmentElement(chapter, index);
+        speakerSegments.appendChild(segmentElement);
+    });
+    
+    // 设置音频播放器关闭按钮事件
+    const closePlayerBtn = document.getElementById('closePlayer');
+    if (closePlayerBtn) {
+        closePlayerBtn.onclick = () => {
+            const audioPlayerSection = document.getElementById('audioPlayerSection');
+            audioPlayerSection.classList.add('hidden');
+        };
+    }
+}
+
+// 创建Speaker段落元素
+function createSpeakerSegmentElement(chapter, index) {
+    const segmentDiv = document.createElement('div');
+    segmentDiv.className = 'timeline-segment relative flex items-start';
+    segmentDiv.setAttribute('data-segment-index', index);
+    
+    // 确定位置（左侧或右侧）
+    const isLeft = chapter.position === 'left';
+    const speakerColor = isLeft ? 'bg-blue-500' : 'bg-green-500';
+    const bgColor = isLeft ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200';
+    const textColor = isLeft ? 'text-blue-900' : 'text-green-900';
+    
+    // 解析时间
+    const startTime = chapter.startTime || 0;
+    const endTime = chapter.endTime || startTime;
+    const duration = Math.round(endTime - startTime);
+    
+    segmentDiv.innerHTML = `
+        <!-- Timeline Dot -->
+        <div class="absolute left-1/2 transform -translate-x-1/2 -translate-y-1 z-20">
+            <div class="w-4 h-4 ${speakerColor} rounded-full border-2 border-white shadow-sm"></div>
+        </div>
+        
+        <!-- Content Container -->
+        <div class="w-1/2 ${isLeft ? 'pr-8' : 'pl-8 ml-auto'}">
+            <div class="speaker-segment-card ${bgColor} border rounded-lg p-4 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                 data-start-time="${startTime}" 
+                 data-end-time="${endTime}"
+                 data-speaker="${chapter.speaker}">
+                
+                <!-- Header -->
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 ${speakerColor} rounded-full"></div>
+                        <h4 class="font-semibold ${textColor} text-sm">
+                            ${chapter.speaker}
+                        </h4>
+                    </div>
+                    <div class="text-xs text-gray-500">
+                        ${formatTimeFromSeconds(startTime)} (${duration}s)
+                    </div>
+                </div>
+                
+                <!-- Summary -->
+                <div class="segment-summary text-gray-700 text-sm leading-relaxed mb-3">
+                    ${chapter.summary || '暂无摘要'}
+                </div>
+                
+                <!-- Metadata -->
+                <div class="flex items-center justify-between text-xs text-gray-500">
+                    <span>${chapter.segmentCount || 1} 个语句</span>
+                    <button class="play-segment-btn text-blue-600 hover:text-blue-800 transition-colors flex items-center space-x-1"
+                            title="播放此段落">
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9-5.89a1.5 1.5 0 000-2.538l-9-5.89z" />
+                        </svg>
+                        <span>播放</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // 添加点击事件
+    const segmentCard = segmentDiv.querySelector('.speaker-segment-card');
+    segmentCard.addEventListener('click', () => {
+        jumpToSpeakerSegment(startTime, endTime, chapter.speaker);
+    });
+    
+    const playButton = segmentDiv.querySelector('.play-segment-btn');
+    playButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        jumpToSpeakerSegment(startTime, endTime, chapter.speaker);
+    });
+    
+    return segmentDiv;
+}
+
+// 跳转到Speaker段落
+function jumpToSpeakerSegment(startTime, endTime, speaker) {
+    const audioPlayer = document.getElementById('podcastAudioPlayer');
+    const audioPlayerSection = document.getElementById('audioPlayerSection');
+    const currentSegmentInfo = document.getElementById('currentSegmentInfo');
+    const audioSource = document.getElementById('audioSource');
+    
+    // 检查音频是否加载
+    if (!audioPlayer) {
+        alert(currentLang === 'zh' ? '播放器未找到' : 'Audio player not found');
+        return;
+    }
+    
+    // 检查音频源是否设置
+    if (!audioSource.src || audioSource.src === '') {
+        alert(currentLang === 'zh' ? '音频文件尚未加载' : 'Audio file not loaded');
+        console.log('🎵 音频源未设置，当前src:', audioSource.src);
+        return;
+    }
+    
+    // 显示音频播放器
+    audioPlayerSection.classList.remove('hidden');
+    
+    // 等待音频加载完成再跳转
+    const playSegment = () => {
+        audioPlayer.currentTime = startTime;
+        audioPlayer.play().catch(e => {
+            console.warn('播放失败:', e);
+            alert(currentLang === 'zh' ? '播放失败，请稍后重试' : 'Playback failed, please try again');
+        });
+        
+        // 更新当前段落信息
+        currentSegmentInfo.textContent = `正在播放：${speaker} - ${formatTimeFromSeconds(startTime)}`;
+        
+        // 高亮当前段落
+        highlightCurrentSegment(startTime);
+        
+        console.log(`🎵 跳转到${speaker}的段落: ${formatTimeFromSeconds(startTime)} - ${formatTimeFromSeconds(endTime)}`);
+    };
+    
+    if (audioPlayer.readyState >= 2) { // 已加载足够数据
+        playSegment();
+    } else {
+        // 等待加载
+        const loadHandler = () => {
+            playSegment();
+            audioPlayer.removeEventListener('canplay', loadHandler);
+        };
+        audioPlayer.addEventListener('canplay', loadHandler);
+        audioPlayer.load(); // 强制重新加载
+    }
+}
+
+// 高亮当前播放的段落
+function highlightCurrentSegment(currentTime) {
+    const allSegments = document.querySelectorAll('.speaker-segment-card');
+    allSegments.forEach(segment => {
+        const startTime = parseFloat(segment.dataset.startTime);
+        const endTime = parseFloat(segment.dataset.endTime);
+        
+        segment.classList.remove('ring-2', 'ring-blue-400', 'ring-green-400');
+        
+        if (currentTime >= startTime && currentTime <= endTime) {
+            const speaker = segment.dataset.speaker;
+            const ringColor = speaker === '主持人' ? 'ring-blue-400' : 'ring-green-400';
+            segment.classList.add('ring-2', ringColor);
+        }
+    });
+}
+
+// 格式化秒数为时间字符串
+function formatTimeFromSeconds(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    
+    if (hours > 0) {
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+// 跳转到指定章节（保留兼容性）
+function jumpToChapter(timeString, chapterTitle) {
+    const audioPlayer = document.getElementById('podcastAudioPlayer');
+    const currentChapterInfo = document.getElementById('currentChapterInfo');
+    
+    if (!audioPlayer || !audioPlayer.src) {
+        alert(currentLang === 'zh' ? '音频文件尚未加载' : 'Audio file not loaded');
+        return;
+    }
+    
+    // 解析时间字符串 (格式: HH:MM 或 MM:SS)
+    const timeSeconds = parseTimeString(timeString);
+    
+    // 跳转到指定时间
+    audioPlayer.currentTime = timeSeconds;
+    audioPlayer.play().catch(e => {
+        console.warn('自动播放失败:', e);
+    });
+    
+    // 更新当前章节信息
+    if (currentChapterInfo) {
+        currentChapterInfo.textContent = `正在播放: ${chapterTitle}`;
+    }
+    
+    // 高亮当前章节
+    highlightCurrentChapter(timeString);
+    
+    console.log(`🎵 跳转到章节: ${chapterTitle} (${timeString})`);
+}
+
+// 解析时间字符串为秒数
+function parseTimeString(timeString) {
+    const parts = timeString.split(':').map(p => parseInt(p, 10));
+    if (parts.length === 2) {
+        return parts[0] * 60 + parts[1]; // MM:SS
+    } else if (parts.length === 3) {
+        return parts[0] * 3600 + parts[1] * 60 + parts[2]; // HH:MM:SS
+    }
+    return 0;
+}
+
+// 高亮当前播放章节
+function highlightCurrentChapter(timeString) {
+    // 移除所有高亮
+    document.querySelectorAll('.chapter-item').forEach(item => {
+        item.classList.remove('ring-2', 'ring-purple-400', 'bg-purple-50');
+    });
+    
+    // 高亮当前章节
+    const playButton = document.querySelector(`[data-start-time="${timeString}"]`);
+    if (playButton) {
+        const chapterItem = playButton.closest('.chapter-item');
+        chapterItem.classList.add('ring-2', 'ring-purple-400', 'bg-purple-50');
+    }
+}
+
+// 设置音频播放器
+function setupAudioPlayer(audioUrl) {
+    const audioPlayerSection = document.getElementById('audioPlayerSection');
+    const audioSource = document.getElementById('audioSource');
+    const audioPlayer = document.getElementById('podcastAudioPlayer');
+    
+    if (!audioUrl) {
+        console.log('🎵 没有音频URL，隐藏播放器');
+        audioPlayerSection.classList.add('hidden');
+        return;
+    }
+    
+    audioSource.src = audioUrl;
+    audioPlayer.load();
+    audioPlayerSection.classList.remove('hidden');
+    
+    console.log('🎵 音频播放器已设置:', audioUrl);
+}
+
+// ========================================
+// 热词高亮相关函数
+// ========================================
+
+// 高亮专业热词
+function highlightHotwords(htmlContent, professionalTerms) {
+    if (!professionalTerms || !professionalTerms.fullList || professionalTerms.fullList.length === 0) {
+        return htmlContent;
+    }
+    
+    let highlightedContent = htmlContent;
+    
+    // 按长度排序，长词优先匹配
+    const sortedTerms = professionalTerms.fullList
+        .filter(term => term.chinese || term.english)
+        .sort((a, b) => {
+            const aText = a.chinese || a.english || '';
+            const bText = b.chinese || b.english || '';
+            return bText.length - aText.length;
+        });
+    
+    sortedTerms.forEach((term, index) => {
+        const chinese = term.chinese || '';
+        const english = term.english || '';
+        
+        // 创建匹配模式
+        const patterns = [];
+        if (chinese) patterns.push(escapeRegex(chinese));
+        if (english) patterns.push(escapeRegex(english));
+        
+        patterns.forEach(pattern => {
+            if (pattern.length < 2) return; // 跳过太短的词
+            
+            // 使用全词匹配，避免部分匹配
+            const regex = new RegExp(`\\b${pattern}\\b`, 'gi');
+            
+            // 生成高亮HTML
+            const highlightClass = getHotwordHighlightClass(index);
+            const tooltip = chinese && english ? `${chinese} | ${english}` : (chinese || english);
+            
+            highlightedContent = highlightedContent.replace(regex, (match) => {
+                return `<span class="${highlightClass}" title="${tooltip}" data-hotword="${match}">${match}</span>`;
+            });
+        });
+    });
+    
+    return highlightedContent;
+}
+
+// 转义正则表达式特殊字符
+function escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// 获取热词高亮样式类
+function getHotwordHighlightClass(index) {
+    const colors = [
+        'bg-yellow-200 text-yellow-800 border-yellow-400',
+        'bg-blue-200 text-blue-800 border-blue-400',
+        'bg-green-200 text-green-800 border-green-400',
+        'bg-purple-200 text-purple-800 border-purple-400',
+        'bg-pink-200 text-pink-800 border-pink-400',
+        'bg-indigo-200 text-indigo-800 border-indigo-400'
+    ];
+    
+    const colorIndex = index % colors.length;
+    return `hotword-highlight ${colors[colorIndex]} px-1 py-0.5 rounded text-sm font-medium border border-dashed cursor-help transition-all hover:shadow-md`;
+}
+
+// 创建热词索引面板
+function createHotwordsIndex(professionalTerms) {
+    if (!professionalTerms || !professionalTerms.fullList || professionalTerms.fullList.length === 0) {
+        return null;
+    }
+    
+    const indexPanel = document.createElement('div');
+    indexPanel.className = 'hotwords-index bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg p-4 mb-4 border border-yellow-200';
+    
+    indexPanel.innerHTML = `
+        <div class="flex items-center justify-between mb-3">
+            <h4 class="text-lg font-semibold text-yellow-800">
+                <span class="mr-2">🔍</span>
+                专业术语索引 (${professionalTerms.totalCount}个)
+            </h4>
+            <button id="toggleHotwordsIndex" class="text-yellow-600 hover:text-yellow-800 text-sm font-medium">
+                收起
+            </button>
+        </div>
+        <div id="hotwordsIndexContent" class="hotwords-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+            ${professionalTerms.fullList.map((term, index) => {
+                const chinese = term.chinese || '';
+                const english = term.english || '';
+                const display = chinese && english ? `${chinese} | ${english}` : (chinese || english);
+                const highlightClass = getHotwordHighlightClass(index);
+                
+                return `
+                    <div class="hotword-index-item ${highlightClass} p-2 rounded cursor-pointer transition-all hover:shadow-sm"
+                         data-term="${chinese || english}"
+                         title="点击高亮此术语">
+                        <div class="text-sm font-medium">${display}</div>
+                        ${term.frequency ? `<div class="text-xs opacity-75">出现 ${term.frequency} 次</div>` : ''}
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+    
+    // 添加交互功能
+    setTimeout(() => {
+        const toggleButton = indexPanel.querySelector('#toggleHotwordsIndex');
+        const content = indexPanel.querySelector('#hotwordsIndexContent');
+        
+        if (toggleButton && content) {
+            toggleButton.addEventListener('click', () => {
+                const isHidden = content.classList.contains('hidden');
+                if (isHidden) {
+                    content.classList.remove('hidden');
+                    toggleButton.textContent = '收起';
+                } else {
+                    content.classList.add('hidden');
+                    toggleButton.textContent = '展开';
+                }
+            });
+        }
+        
+        // 点击术语高亮功能
+        indexPanel.querySelectorAll('.hotword-index-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const term = item.dataset.term;
+                highlightSpecificHotword(term);
+            });
+        });
+    }, 100);
+    
+    return indexPanel;
+}
+
+// 高亮特定热词
+function highlightSpecificHotword(term) {
+    // 移除之前的特殊高亮
+    document.querySelectorAll('.hotword-special-highlight').forEach(el => {
+        el.classList.remove('hotword-special-highlight', 'ring-2', 'ring-red-400', 'bg-red-100');
+    });
+    
+    // 找到所有匹配的热词并高亮
+    document.querySelectorAll(`[data-hotword="${term}"]`).forEach(el => {
+        el.classList.add('hotword-special-highlight', 'ring-2', 'ring-red-400', 'bg-red-100');
+        
+        // 滚动到第一个匹配项
+        if (document.querySelectorAll('.hotword-special-highlight').length === 1) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    });
+    
+    // 3秒后移除特殊高亮
+    setTimeout(() => {
+        document.querySelectorAll('.hotword-special-highlight').forEach(el => {
+            el.classList.remove('hotword-special-highlight', 'ring-2', 'ring-red-400', 'bg-red-100');
+        });
+    }, 3000);
+    
+    console.log(`🔍 已高亮术语: ${term}`);
 }

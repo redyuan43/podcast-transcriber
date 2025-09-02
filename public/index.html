@@ -482,6 +482,65 @@
                                 <div id="translationText" class="prose prose-slate max-w-none text-base leading-relaxed whitespace-pre-line"></div>
                             </div>
                         </div>
+
+                        <!-- Speaker Timeline Tab Content -->
+                        <div id="chaptersTabContent" class="tab-content hidden">
+                            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                                <!-- Fixed Audio Player at Bottom -->
+                                <div id="audioPlayerSection" class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg p-4 z-50 hidden">
+                                    <div class="container mx-auto flex items-center justify-between">
+                                        <div class="flex items-center space-x-4 flex-1">
+                                            <div class="text-sm font-medium text-gray-700" id="currentSegmentInfo">
+                                                点击对话段落开始播放
+                                            </div>
+                                        </div>
+                                        <audio id="podcastAudioPlayer" controls class="flex-1 max-w-md">
+                                            <source id="audioSource" src="" type="audio/mpeg">
+                                            您的浏览器不支持音频播放器。
+                                        </audio>
+                                        <button id="closePlayer" class="ml-4 p-2 text-gray-500 hover:text-gray-700 transition-colors">
+                                            ✕
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Timeline Header -->
+                                <div class="p-6 pb-4 border-b border-blue-200 bg-white/70 rounded-t-xl">
+                                    <h2 class="text-xl font-bold text-blue-900 mb-2">对话时间轴</h2>
+                                    <div class="flex items-center space-x-4 text-sm text-blue-700">
+                                        <div class="flex items-center space-x-2">
+                                            <div class="w-4 h-4 bg-blue-500 rounded-full"></div>
+                                            <span id="leftSpeakerLabel">主持人</span>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <div class="w-4 h-4 bg-green-500 rounded-full"></div>
+                                            <span id="rightSpeakerLabel">嘉宾</span>
+                                        </div>
+                                        <div class="text-gray-500" id="timelineStats">
+                                            共 0 个对话段落
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Timeline Content -->
+                                <div class="relative p-6 pb-24" id="timelineContainer" style="min-height: 600px;">
+                                    <!-- Central Timeline Line -->
+                                    <div class="absolute left-1/2 top-6 bottom-24 w-0.5 bg-gradient-to-b from-blue-300 to-indigo-300 transform -translate-x-px z-10" id="timelineLine"></div>
+                                    
+                                    <!-- Speaker Segments Container -->
+                                    <div id="speakerSegments" class="space-y-8">
+                                        <!-- Speaker segments will be dynamically added here -->
+                                    </div>
+                                </div>
+
+                                <!-- No Chapters Message -->
+                                <div id="noChaptersMessage" class="text-center py-12 text-gray-500 hidden">
+                                    <div class="text-4xl mb-2">🎭</div>
+                                    <p>暂无对话段落信息</p>
+                                    <p class="text-sm">需要启用增强转录和AI分析功能</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
