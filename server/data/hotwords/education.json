@@ -1,0 +1,206 @@
+{
+  "domain": "教育-职场",
+  "version": "1.0",
+  "terms": [
+    {
+      "english": "职场发展",
+      "chinese": "职场发展",
+      "variants": ["Career Development", "职业发展"]
+    },
+    {
+      "english": "技能提升",
+      "chinese": "技能提升",
+      "variants": ["Skill Enhancement", "能力提升"]
+    },
+    {
+      "english": "软技能",
+      "chinese": "软技能",
+      "variants": ["Soft Skills", "软实力"]
+    },
+    {
+      "english": "硬技能",
+      "chinese": "硬技能",
+      "variants": ["Hard Skills", "专业技能"]
+    },
+    {
+      "english": "领导力",
+      "chinese": "领导力",
+      "variants": ["Leadership", "领导能力"]
+    },
+    {
+      "english": "团队协作",
+      "chinese": "团队协作",
+      "variants": ["Team Collaboration", "团队合作"]
+    },
+    {
+      "english": "项目管理",
+      "chinese": "项目管理",
+      "variants": ["Project Management", "PM"]
+    },
+    {
+      "english": "时间管理",
+      "chinese": "时间管理",
+      "variants": ["Time Management", "时间规划"]
+    },
+    {
+      "english": "沟通技巧",
+      "chinese": "沟通技巧",
+      "variants": ["Communication Skills", "沟通能力"]
+    },
+    {
+      "english": "批判性思维",
+      "chinese": "批判性思维",
+      "variants": ["Critical Thinking", "批判思考"]
+    },
+    {
+      "english": "创新思维",
+      "chinese": "创新思维",
+      "variants": ["Innovative Thinking", "创新能力"]
+    },
+    {
+      "english": "终身学习",
+      "chinese": "终身学习",
+      "variants": ["Lifelong Learning", "持续学习"]
+    },
+    {
+      "english": "在线教育",
+      "chinese": "在线教育",
+      "variants": ["Online Education", "线上教育", "网络教育"]
+    },
+    {
+      "english": "MOOC",
+      "chinese": "大规模开放在线课程",
+      "variants": ["Massive Open Online Course", "慕课"]
+    },
+    {
+      "english": "知识付费",
+      "chinese": "知识付费",
+      "variants": ["Knowledge Payment", "内容付费"]
+    },
+    {
+      "english": "职业规划",
+      "chinese": "职业规划",
+      "variants": ["Career Planning", "生涯规划"]
+    },
+    {
+      "english": "面试技巧",
+      "chinese": "面试技巧",
+      "variants": ["Interview Skills", "面试准备"]
+    },
+    {
+      "english": "简历优化",
+      "chinese": "简历优化",
+      "variants": ["Resume Optimization", "CV优化"]
+    },
+    {
+      "english": "绩效评估",
+      "chinese": "绩效评估",
+      "variants": ["Performance Evaluation", "绩效考核"]
+    },
+    {
+      "english": "晋升机会",
+      "chinese": "晋升机会",
+      "variants": ["Promotion Opportunity", "升职"]
+    },
+    {
+      "english": "薪资谈判",
+      "chinese": "薪资谈判",
+      "variants": ["Salary Negotiation", "工资协商"]
+    },
+    {
+      "english": "工作生活平衡",
+      "chinese": "工作生活平衡",
+      "variants": ["Work-Life Balance", "生活平衡"]
+    },
+    {
+      "english": "远程办公",
+      "chinese": "远程办公",
+      "variants": ["Remote Work", "在家办公", "居家办公"]
+    },
+    {
+      "english": "混合办公",
+      "chinese": "混合办公",
+      "variants": ["Hybrid Work", "灵活办公"]
+    },
+    {
+      "english": "企业文化",
+      "chinese": "企业文化",
+      "variants": ["Corporate Culture", "公司文化"]
+    },
+    {
+      "english": "职业倦怠",
+      "chinese": "职业倦怠",
+      "variants": ["Burnout", "工作倦怠"]
+    },
+    {
+      "english": "压力管理",
+      "chinese": "压力管理",
+      "variants": ["Stress Management", "压力调节"]
+    },
+    {
+      "english": "情商",
+      "chinese": "情商",
+      "variants": ["EQ", "Emotional Intelligence", "情绪智力"]
+    },
+    {
+      "english": "跨部门协作",
+      "chinese": "跨部门协作",
+      "variants": ["Cross-functional Collaboration", "跨团队合作"]
+    },
+    {
+      "english": "导师制度",
+      "chinese": "导师制度",
+      "variants": ["Mentorship", "师徒制"]
+    },
+    {
+      "english": "培训体系",
+      "chinese": "培训体系",
+      "variants": ["Training System", "培训计划"]
+    },
+    {
+      "english": "认证考试",
+      "chinese": "认证考试",
+      "variants": ["Certification Exam", "资格认证"]
+    },
+    {
+      "english": "专业发展",
+      "chinese": "专业发展",
+      "variants": ["Professional Development", "专业成长"]
+    },
+    {
+      "english": "行业洞察",
+      "chinese": "行业洞察",
+      "variants": ["Industry Insight", "行业分析"]
+    },
+    {
+      "english": "人脉网络",
+      "chinese": "人脉网络",
+      "variants": ["Networking", "人际网络"]
+    },
+    {
+      "english": "个人品牌",
+      "chinese": "个人品牌",
+      "variants": ["Personal Branding", "个人IP"]
+    },
+    {
+      "english": "知识管理",
+      "chinese": "知识管理",
+      "variants": ["Knowledge Management", "知识体系"]
+    },
+    {
+      "english": "学习路径",
+      "chinese": "学习路径",
+      "variants": ["Learning Path", "学习路线"]
+    },
+    {
+      "english": "实习经验",
+      "chinese": "实习经验",
+      "variants": ["Internship Experience", "实习"]
+    },
+    {
+      "english": "校招",
+      "chinese": "校园招聘",
+      "variants": ["Campus Recruitment", "应届生招聘"]
+    }
+  ]
+}

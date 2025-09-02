@@ -1,0 +1,206 @@
+{
+  "domain": "商业-创业",
+  "version": "1.0",
+  "terms": [
+    {
+      "english": "IPO",
+      "chinese": "首次公开募股",
+      "variants": ["Initial Public Offering", "上市"]
+    },
+    {
+      "english": "VC",
+      "chinese": "风险投资",
+      "variants": ["Venture Capital", "风投", "创投"]
+    },
+    {
+      "english": "PE",
+      "chinese": "私募股权",
+      "variants": ["Private Equity", "私募"]
+    },
+    {
+      "english": "Angel Investor",
+      "chinese": "天使投资人",
+      "variants": ["天使投资", "天使轮"]
+    },
+    {
+      "english": "Unicorn",
+      "chinese": "独角兽",
+      "variants": ["独角兽企业", "独角兽公司"]
+    },
+    {
+      "english": "Startup",
+      "chinese": "创业公司",
+      "variants": ["初创公司", "新创企业"]
+    },
+    {
+      "english": "Scale-up",
+      "chinese": "规模化",
+      "variants": ["扩张", "快速成长"]
+    },
+    {
+      "english": "Pivot",
+      "chinese": "转型",
+      "variants": ["业务转型", "战略转向"]
+    },
+    {
+      "english": "MVP",
+      "chinese": "最小可行产品",
+      "variants": ["Minimum Viable Product", "最简产品"]
+    },
+    {
+      "english": "PMF",
+      "chinese": "产品市场契合",
+      "variants": ["Product Market Fit", "产品市场匹配"]
+    },
+    {
+      "english": "B2B",
+      "chinese": "企业对企业",
+      "variants": ["Business to Business", "企业服务"]
+    },
+    {
+      "english": "B2C",
+      "chinese": "企业对消费者",
+      "variants": ["Business to Consumer", "直接面向消费者"]
+    },
+    {
+      "english": "SaaS",
+      "chinese": "软件即服务",
+      "variants": ["Software as a Service", "软件服务"]
+    },
+    {
+      "english": "ROI",
+      "chinese": "投资回报率",
+      "variants": ["Return on Investment", "投资收益率"]
+    },
+    {
+      "english": "KPI",
+      "chinese": "关键绩效指标",
+      "variants": ["Key Performance Indicator", "核心指标"]
+    },
+    {
+      "english": "OKR",
+      "chinese": "目标与关键成果",
+      "variants": ["Objectives and Key Results", "目标管理"]
+    },
+    {
+      "english": "商业模式",
+      "chinese": "商业模式",
+      "variants": ["Business Model", "盈利模式"]
+    },
+    {
+      "english": "融资",
+      "chinese": "融资",
+      "variants": ["Funding", "募资", "筹资"]
+    },
+    {
+      "english": "估值",
+      "chinese": "估值",
+      "variants": ["Valuation", "企业估值"]
+    },
+    {
+      "english": "烧钱",
+      "chinese": "烧钱",
+      "variants": ["Burn Rate", "资金消耗"]
+    },
+    {
+      "english": "现金流",
+      "chinese": "现金流",
+      "variants": ["Cash Flow", "资金流"]
+    },
+    {
+      "english": "市场份额",
+      "chinese": "市场份额",
+      "variants": ["Market Share", "市占率"]
+    },
+    {
+      "english": "竞争优势",
+      "chinese": "竞争优势",
+      "variants": ["Competitive Advantage", "竞争力"]
+    },
+    {
+      "english": "护城河",
+      "chinese": "护城河",
+      "variants": ["Moat", "竞争壁垒"]
+    },
+    {
+      "english": "增长黑客",
+      "chinese": "增长黑客",
+      "variants": ["Growth Hacking", "增长策略"]
+    },
+    {
+      "english": "用户增长",
+      "chinese": "用户增长",
+      "variants": ["User Growth", "用户获取"]
+    },
+    {
+      "english": "留存率",
+      "chinese": "留存率",
+      "variants": ["Retention Rate", "用户留存"]
+    },
+    {
+      "english": "转化率",
+      "chinese": "转化率",
+      "variants": ["Conversion Rate", "转换率"]
+    },
+    {
+      "english": "获客成本",
+      "chinese": "获客成本",
+      "variants": ["CAC", "Customer Acquisition Cost"]
+    },
+    {
+      "english": "生命周期价值",
+      "chinese": "生命周期价值",
+      "variants": ["LTV", "Lifetime Value", "客户终身价值"]
+    },
+    {
+      "english": "供应链",
+      "chinese": "供应链",
+      "variants": ["Supply Chain", "产业链"]
+    },
+    {
+      "english": "生态系统",
+      "chinese": "生态系统",
+      "variants": ["Ecosystem", "商业生态"]
+    },
+    {
+      "english": "数字化转型",
+      "chinese": "数字化转型",
+      "variants": ["Digital Transformation", "数字化"]
+    },
+    {
+      "english": "战略规划",
+      "chinese": "战略规划",
+      "variants": ["Strategic Planning", "战略布局"]
+    },
+    {
+      "english": "并购",
+      "chinese": "并购",
+      "variants": ["M&A", "Merger and Acquisition", "收购"]
+    },
+    {
+      "english": "股权激励",
+      "chinese": "股权激励",
+      "variants": ["Equity Incentive", "期权", "股票期权"]
+    },
+    {
+      "english": "商业计划书",
+      "chinese": "商业计划书",
+      "variants": ["Business Plan", "BP"]
+    },
+    {
+      "english": "路演",
+      "chinese": "路演",
+      "variants": ["Roadshow", "投资路演"]
+    },
+    {
+      "english": "尽职调查",
+      "chinese": "尽职调查",
+      "variants": ["Due Diligence", "DD", "尽调"]
+    },
+    {
+      "english": "退出机制",
+      "chinese": "退出机制",
+      "variants": ["Exit Strategy", "退出策略"]
+    }
+  ]
+}

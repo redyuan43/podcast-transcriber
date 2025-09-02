@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const { promisify } = require('util');
+const contentAnalysisService = require('./contentAnalysisService');
 
 const execAsync = promisify(exec);
 
@@ -272,6 +273,49 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
                 console.log(`✅ 无需翻译 (语言一致: ${result.detectedLanguage} = ${outputLanguage})`);
                 result.needsTranslation = false;
             }
+            
+            // 执行AI内容分析（步骤3-6）
+            let analysisResult = null;
+            if (process.env.USE_OLLAMA === 'true' && result.segments) {
+                console.log('\n🤖 开始AI内容分析...');
+                if (sendProgressCallback) {
+                    sendProgressCallback(80, 'analyzing', outputLanguage === 'zh' ? 'AI内容分析' : 'AI Content Analysis');
+                }
+                
+                try {
+                    const transcriptData = {
+                        text: transcript,
+                        segments: result.segments,
+                        speakers: result.speakers,
+                        title: podcastTitle,
+                        source: originalUrl
+                    };
+                    
+                    analysisResult = await contentAnalysisService.analyzeContent(transcriptData);
+                    
+                    if (analysisResult && analysisResult.success) {
+                        // 保存分析报告
+                        const analysisMarkdown = contentAnalysisService.exportToMarkdown(analysisResult, transcriptData);
+                        if (analysisMarkdown) {
+                            const analysisPrefix = generateFilePrefix('analysis', podcastTitle || 'Untitled');
+                            const analysisFileName = `${analysisPrefix}.md`;
+                            const analysisPath = path.join(tempDir, analysisFileName);
+                            fs.writeFileSync(analysisPath, analysisMarkdown, 'utf8');
+                            
+                            savedFiles.push({
+                                type: 'analysis',
+                                filename: analysisFileName,
+                                path: analysisPath,
+                                size: fs.statSync(analysisPath).size
+                            });
+                            
+                            console.log(`📊 AI分析报告已保存: ${analysisFileName}`);
+                        }
+                    }
+                } catch (analysisError) {
+                    console.error('❌ AI内容分析失败:', analysisError.message);
+                }
+            }
             // 返回处理后的结果
             return {
                 transcript: transcript,
@@ -281,7 +325,8 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
                 detectedLanguage: result.detectedLanguage,
                 needsTranslation: result.needsTranslation || false,
                 audioDuration: result.audioDuration, // 从Whisper获取的真实音频时长
-                savedFiles: savedFiles
+                savedFiles: savedFiles,
+                analysis: analysisResult // AI内容分析结果
             };
             
         } else {

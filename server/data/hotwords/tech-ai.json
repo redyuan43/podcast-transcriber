@@ -1,0 +1,252 @@
+{
+  "domain": "科技-人工智能",
+  "version": "1.0",
+  "source": "Based on jiqizhixin/Artificial-Intelligence-Terminology-Database",
+  "terms": [
+    {
+      "english": "AIGC",
+      "chinese": "AI生成内容",
+      "variants": ["AI Generated Content", "人工智能生成内容"]
+    },
+    {
+      "english": "LLM",
+      "chinese": "大语言模型",
+      "variants": ["Large Language Model", "大模型"]
+    },
+    {
+      "english": "GPT",
+      "chinese": "生成式预训练变换器",
+      "variants": ["Generative Pre-trained Transformer", "生成式预训练模型"]
+    },
+    {
+      "english": "Transformer",
+      "chinese": "变换器",
+      "variants": ["Transformer架构", "变压器模型"]
+    },
+    {
+      "english": "Neural Network",
+      "chinese": "神经网络",
+      "variants": ["NN", "人工神经网络", "ANN"]
+    },
+    {
+      "english": "Deep Learning",
+      "chinese": "深度学习",
+      "variants": ["DL", "深层学习"]
+    },
+    {
+      "english": "Machine Learning",
+      "chinese": "机器学习",
+      "variants": ["ML", "机械学习"]
+    },
+    {
+      "english": "NLP",
+      "chinese": "自然语言处理",
+      "variants": ["Natural Language Processing", "自然语言理解"]
+    },
+    {
+      "english": "Computer Vision",
+      "chinese": "计算机视觉",
+      "variants": ["CV", "机器视觉", "视觉识别"]
+    },
+    {
+      "english": "Reinforcement Learning",
+      "chinese": "强化学习",
+      "variants": ["RL", "增强学习"]
+    },
+    {
+      "english": "Transfer Learning",
+      "chinese": "迁移学习",
+      "variants": ["TL", "转移学习"]
+    },
+    {
+      "english": "Fine-tuning",
+      "chinese": "微调",
+      "variants": ["精调", "模型微调"]
+    },
+    {
+      "english": "Prompt Engineering",
+      "chinese": "提示工程",
+      "variants": ["提示词工程", "Prompt设计"]
+    },
+    {
+      "english": "Embedding",
+      "chinese": "嵌入",
+      "variants": ["向量嵌入", "词嵌入", "Word Embedding"]
+    },
+    {
+      "english": "Attention Mechanism",
+      "chinese": "注意力机制",
+      "variants": ["Attention", "自注意力", "Self-Attention"]
+    },
+    {
+      "english": "Gradient Descent",
+      "chinese": "梯度下降",
+      "variants": ["GD", "梯度下降法"]
+    },
+    {
+      "english": "Backpropagation",
+      "chinese": "反向传播",
+      "variants": ["BP", "反向传播算法"]
+    },
+    {
+      "english": "Overfitting",
+      "chinese": "过拟合",
+      "variants": ["过度拟合", "过学习"]
+    },
+    {
+      "english": "Underfitting",
+      "chinese": "欠拟合",
+      "variants": ["拟合不足", "欠学习"]
+    },
+    {
+      "english": "Regularization",
+      "chinese": "正则化",
+      "variants": ["规范化", "正规化"]
+    },
+    {
+      "english": "Dropout",
+      "chinese": "随机失活",
+      "variants": ["丢弃法", "暂退法"]
+    },
+    {
+      "english": "Batch Normalization",
+      "chinese": "批归一化",
+      "variants": ["BN", "批标准化"]
+    },
+    {
+      "english": "CNN",
+      "chinese": "卷积神经网络",
+      "variants": ["Convolutional Neural Network", "卷积网络"]
+    },
+    {
+      "english": "RNN",
+      "chinese": "循环神经网络",
+      "variants": ["Recurrent Neural Network", "递归神经网络"]
+    },
+    {
+      "english": "LSTM",
+      "chinese": "长短期记忆网络",
+      "variants": ["Long Short-Term Memory", "长短时记忆"]
+    },
+    {
+      "english": "GRU",
+      "chinese": "门控循环单元",
+      "variants": ["Gated Recurrent Unit", "门控循环网络"]
+    },
+    {
+      "english": "GAN",
+      "chinese": "生成对抗网络",
+      "variants": ["Generative Adversarial Network", "对抗生成网络"]
+    },
+    {
+      "english": "VAE",
+      "chinese": "变分自编码器",
+      "variants": ["Variational Autoencoder", "变分自动编码器"]
+    },
+    {
+      "english": "BERT",
+      "chinese": "双向编码器表征",
+      "variants": ["Bidirectional Encoder Representations from Transformers"]
+    },
+    {
+      "english": "Zero-shot Learning",
+      "chinese": "零样本学习",
+      "variants": ["零次学习", "Zero-shot"]
+    },
+    {
+      "english": "Few-shot Learning",
+      "chinese": "少样本学习",
+      "variants": ["小样本学习", "Few-shot"]
+    },
+    {
+      "english": "Meta Learning",
+      "chinese": "元学习",
+      "variants": ["学会学习", "元机器学习"]
+    },
+    {
+      "english": "AutoML",
+      "chinese": "自动机器学习",
+      "variants": ["Automated Machine Learning", "自动化机器学习"]
+    },
+    {
+      "english": "Edge AI",
+      "chinese": "边缘人工智能",
+      "variants": ["边缘智能", "端侧AI"]
+    },
+    {
+      "english": "Federated Learning",
+      "chinese": "联邦学习",
+      "variants": ["联合学习", "联盟学习"]
+    },
+    {
+      "english": "Explainable AI",
+      "chinese": "可解释人工智能",
+      "variants": ["XAI", "可解释AI", "可解释性AI"]
+    },
+    {
+      "english": "AGI",
+      "chinese": "通用人工智能",
+      "variants": ["Artificial General Intelligence", "强人工智能"]
+    },
+    {
+      "english": "Multimodal",
+      "chinese": "多模态",
+      "variants": ["多模态学习", "跨模态"]
+    },
+    {
+      "english": "Knowledge Graph",
+      "chinese": "知识图谱",
+      "variants": ["KG", "知识网络"]
+    },
+    {
+      "english": "RAG",
+      "chinese": "检索增强生成",
+      "variants": ["Retrieval Augmented Generation", "检索增强"]
+    },
+    {
+      "english": "Vector Database",
+      "chinese": "向量数据库",
+      "variants": ["矢量数据库", "向量存储"]
+    },
+    {
+      "english": "算力",
+      "chinese": "算力",
+      "variants": ["计算能力", "Computing Power", "计算力"]
+    },
+    {
+      "english": "Token",
+      "chinese": "令牌",
+      "variants": ["词元", "标记"]
+    },
+    {
+      "english": "Inference",
+      "chinese": "推理",
+      "variants": ["推断", "模型推理"]
+    },
+    {
+      "english": "Training",
+      "chinese": "训练",
+      "variants": ["模型训练", "学习"]
+    },
+    {
+      "english": "Dataset",
+      "chinese": "数据集",
+      "variants": ["训练集", "测试集", "验证集"]
+    },
+    {
+      "english": "Benchmark",
+      "chinese": "基准测试",
+      "variants": ["性能测试", "评测"]
+    },
+    {
+      "english": "Hallucination",
+      "chinese": "幻觉",
+      "variants": ["AI幻觉", "模型幻觉", "虚假生成"]
+    },
+    {
+      "english": "Chain of Thought",
+      "chinese": "思维链",
+      "variants": ["CoT", "推理链", "思考链"]
+    }
+  ]
+}
