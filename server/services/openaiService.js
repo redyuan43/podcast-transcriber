@@ -5,6 +5,9 @@ const { exec } = require('child_process');
 const { promisify } = require('util');
 const contentAnalysisService = require('./contentAnalysisService');
 
+// 导入情感分析服务
+const EmotionAnalysisService = require('./emotionAnalysisService');
+
 const execAsync = promisify(exec);
 
 /**
@@ -499,12 +502,21 @@ async function transcribeMultipleAudios(audioFiles, outputLanguage, shouldSaveDi
  * @param {string} language - 语言代码（可选）
  * @returns {Promise<string>} - 转录文本
  */
-async function transcribeAudioLocal(audioPath, language = null, shouldSaveDirectly = false, tempDir = null, originalUrl = null) {
+async function transcribeAudioLocal(audioPath, language = null, shouldSaveDirectly = false, tempDir = null, originalUrl = null, podcastTitle = null, useEnhancedMode = false) {
     try {
         console.log(`🎤 本地转录: ${path.basename(audioPath)}`);
         
-        // 构建Python命令
-        const scriptPath = path.join(__dirname, '..', 'whisper_transcribe.py');
+        // 根据是否启用增强模式选择脚本
+        let scriptPath, scriptName;
+        if (useEnhancedMode) {
+            scriptPath = path.join(__dirname, '..', 'enhanced_whisper_transcribe.py');
+            scriptName = '增强转录脚本';
+            console.log('🚀 使用增强转录模式（说话人分离+情感检测）');
+        } else {
+            scriptPath = path.join(__dirname, '..', 'whisper_transcribe.py');
+            scriptName = '标准转录脚本';
+        }
+        
         const venvPython = path.join(__dirname, '..', '..', 'venv', 'bin', 'python');
         let command = `"${venvPython}" "${scriptPath}" "${audioPath}" --model ${WHISPER_MODEL}`;
         
@@ -512,12 +524,22 @@ async function transcribeAudioLocal(audioPath, language = null, shouldSaveDirect
             command += ` --language ${language}`;
         }
         
+        // 如果使用增强模式，添加增强参数
+        if (useEnhancedMode) {
+            command += ` --enhanced`;
+        }
+        
         // 如果需要直接保存转录文本
         if (shouldSaveDirectly && tempDir) {
             const timestamp = Date.now();
-            const filePrefix = `podcast_${timestamp}`;
+            const filePrefix = podcastTitle ? generateFilePrefix('transcript', podcastTitle) : `podcast_${timestamp}`;
             command += ` --save-transcript "${tempDir}" --file-prefix "${filePrefix}"`;
             console.log(`💾 将直接保存转录文本到: ${tempDir}`);
+        }
+        
+        // 添加播客标题（如果提供）
+        if (podcastTitle) {
+            command += ` --podcast-title "${podcastTitle}"`;
         }
         
         // 添加source URL（如果提供）
@@ -783,9 +805,28 @@ async function generateSummary(transcript, outputLanguage = 'zh') {
     try {
         console.log(`📋 生成总结 (${outputLanguage})...`);
         
+        // 优先使用Ollama，如果失败则尝试OpenAI
+        if (process.env.USE_OLLAMA === 'true') {
+            console.log('🤖 使用Ollama生成总结...');
+            try {
+                const ollamaService = require('./ollamaAnalysisService');
+                return await generateSummaryWithOllama(transcript, outputLanguage, ollamaService);
+            } catch (error) {
+                console.error('❌ Ollama总结失败:', error.message);
+                console.log('🔄 回退到OpenAI总结...');
+            }
+        }
+        
         if (!openai) {
-            console.log('⚠️ OpenAI未配置，跳过AI总结功能');
-            return null;
+            console.log('⚠️ OpenAI未配置，尝试强制使用Ollama生成总结');
+            try {
+                const ollamaService = require('./ollamaAnalysisService');
+                // 强制使用指定的thinking模型
+                return await generateSummaryWithOllamaThinking(transcript, outputLanguage, ollamaService);
+            } catch (error) {
+                console.error('❌ Ollama强制调用也失败:', error.message);
+                return generateBasicSummary(transcript, outputLanguage);
+            }
         }
         
         // 智能处理不同长度的文本
@@ -803,6 +844,61 @@ async function generateSummary(transcript, outputLanguage = 'zh') {
     } catch (error) {
         console.error('❌ 总结生成失败:', error);
         throw new Error(`总结生成失败: ${error.message}`);
+    }
+}
+
+/**
+ * 生成基础总结（当AI服务不可用时）
+ * @param {string} transcript - 转录文本
+ * @param {string} outputLanguage - 输出语言
+ * @returns {string} - 基础总结
+ */
+function generateBasicSummary(transcript, outputLanguage = 'zh') {
+    try {
+        // 提取文本的开头和结尾部分
+        const maxLength = Math.min(transcript.length, 2000);
+        const beginPart = transcript.substring(0, Math.min(500, transcript.length));
+        const endPart = transcript.length > 1000 ? transcript.substring(transcript.length - 300) : '';
+        
+        // 统计一些基本信息
+        const wordCount = transcript.length;
+        const estimatedMinutes = Math.round(wordCount / 200); // 粗略估算播客时长
+        
+        // 尝试提取关键词（简单版本）
+        const keywords = [];
+        const commonTechTerms = ['AI', '人工智能', '机器学习', '深度学习', '算法', '数据', '技术', '创业', '投资', '金融', '市场'];
+        commonTechTerms.forEach(term => {
+            if (transcript.includes(term)) {
+                keywords.push(term);
+            }
+        });
+        
+        if (outputLanguage === 'zh') {
+            return `这是一期约${estimatedMinutes}分钟的播客节目。
+
+**内容开头**: ${beginPart}${beginPart.length >= 500 ? '...' : ''}
+
+${endPart ? `**内容结尾**: ...${endPart}` : ''}
+
+${keywords.length > 0 ? `**涉及话题**: ${keywords.slice(0, 5).join('、')}` : ''}
+
+**说明**: 由于AI总结服务暂时不可用，这是基于转录文本自动生成的基础摘要。完整内容请参考转录文档。`;
+        } else {
+            return `This is approximately a ${estimatedMinutes}-minute podcast episode.
+
+**Opening**: ${beginPart}${beginPart.length >= 500 ? '...' : ''}
+
+${endPart ? `**Ending**: ...${endPart}` : ''}
+
+${keywords.length > 0 ? `**Topics covered**: ${keywords.slice(0, 5).join(', ')}` : ''}
+
+**Note**: This is a basic summary generated automatically as AI summarization services are temporarily unavailable. Please refer to the full transcript for complete content.`;
+        }
+    } catch (error) {
+        console.error('❌ 基础总结生成失败:', error);
+        return outputLanguage === 'zh' ? 
+            '播客转录已完成，但总结功能暂时不可用。请查看完整转录文档了解详细内容。' :
+            'Podcast transcription completed, but summary function is temporarily unavailable. Please refer to the full transcript for detailed content.';
     }
 }
 
@@ -1819,6 +1915,100 @@ function needsTranslation(detectedLanguage, targetLanguage) {
     const normalizedTarget = normalizeLanguage(targetLanguage);
     
     return normalizedDetected !== normalizedTarget && normalizedDetected !== 'unknown';
+}
+
+/**
+ * 使用Ollama生成播客总结
+ */
+async function generateSummaryWithOllama(transcript, outputLanguage, ollamaService) {
+    console.log('🤖 使用Ollama生成播客总结...');
+    
+    const systemPrompt = outputLanguage === 'zh' ? 
+        '你是专业的播客内容总结专家。请生成简洁、准确的播客总结。' :
+        'You are a professional podcast content summarizer. Generate concise and accurate podcast summaries.';
+    
+    const prompt = outputLanguage === 'zh' ? 
+        `请为以下播客转录内容生成一个简洁的总结，要求：
+
+转录内容：
+${transcript.substring(0, 3000)}
+
+要求：
+1. 总结播客的主要内容和核心观点
+2. 保持简洁，大约200-300字
+3. 突出重要信息和关键讨论点
+4. 使用清晰易读的格式
+
+请直接输出总结内容：` :
+        `Please generate a concise summary for the following podcast transcript:
+
+Transcript:
+${transcript.substring(0, 3000)}
+
+Requirements:
+1. Summarize main content and key points
+2. Keep it concise, around 200-300 words
+3. Highlight important information and key discussions
+4. Use clear and readable format
+
+Please output the summary directly:`;
+
+    try {
+        const summary = await ollamaService.callOllama(prompt, systemPrompt, 0.5, 600);
+        
+        if (summary && summary.trim()) {
+            console.log('✅ Ollama总结生成成功');
+            return summary.trim();
+        } else {
+            throw new Error('Ollama返回了空总结');
+        }
+    } catch (error) {
+        console.error('❌ Ollama总结生成失败:', error.message);
+        throw error;
+    }
+}
+
+/**
+ * 使用Ollama Thinking模型生成总结（采用原有提示词）
+ */
+async function generateSummaryWithOllamaThinking(transcript, outputLanguage, ollamaService) {
+    console.log('🤖 使用Ollama Thinking模型生成播客总结...');
+    
+    // 使用原有的系统提示词
+    const systemPrompt = getSystemPromptByLanguage(outputLanguage);
+    
+    // 构建用户提示词，使用原有的格式
+    const userPrompt = outputLanguage === 'zh' ?
+        `以下是播客转录内容，请按照要求生成结构化总结：
+
+${transcript}` :
+        `Here is the podcast transcript content, please generate a structured summary according to the requirements:
+
+${transcript}`;
+
+    try {
+        // 检查ollamaService是否有指定模型的方法
+        const summary = await (ollamaService.callOllamaWithModel ? 
+            ollamaService.callOllamaWithModel(
+                userPrompt, 
+                systemPrompt, 
+                0.3,  // 较低温度保证准确性
+                1000, // 更长的max tokens
+                'qwen3:30b-thinking-2507-q8_0'  // 指定thinking模型
+            ) :
+            ollamaService.callOllama(userPrompt, systemPrompt, 0.3, 1000)
+        );
+        
+        if (summary && summary.trim()) {
+            console.log('✅ Ollama Thinking总结生成成功');
+            return summary.trim();
+        } else {
+            throw new Error('Ollama Thinking返回了空总结');
+        }
+    } catch (error) {
+        console.error('❌ Ollama Thinking总结生成失败:', error.message);
+        throw error;
+    }
 }
 
 module.exports = {

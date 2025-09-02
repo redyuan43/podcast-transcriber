@@ -23,16 +23,26 @@ if (OLLAMA_CONFIG.enabled) {
  * 调用Ollama进行文本分析
  */
 async function callOllama(prompt, systemPrompt = '', temperature = 0.7, maxTokens = 2000) {
+    return await callOllamaWithModel(prompt, systemPrompt, temperature, maxTokens, OLLAMA_CONFIG.model);
+}
+
+/**
+ * 调用Ollama进行文本分析（指定模型）
+ */
+async function callOllamaWithModel(prompt, systemPrompt = '', temperature = 0.7, maxTokens = 2000, model = null) {
     if (!OLLAMA_CONFIG.enabled) {
         console.log('⚠️ Ollama未启用，跳过AI分析');
         return null;
     }
 
+    const useModel = model || OLLAMA_CONFIG.model;
+    console.log(`🤖 调用Ollama模型: ${useModel}`);
+
     try {
         const response = await axios.post(
             `${OLLAMA_CONFIG.baseURL}/chat/completions`,
             {
-                model: OLLAMA_CONFIG.model,
+                model: useModel,
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: prompt }
@@ -45,7 +55,7 @@ async function callOllama(prompt, systemPrompt = '', temperature = 0.7, maxToken
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                timeout: 120000 // 120秒超时
+                timeout: 300000 // 5分钟超时，thinking模型需要更长时间
             }
         );
 
@@ -357,6 +367,7 @@ async function testOllamaConnection() {
 
 module.exports = {
     callOllama,
+    callOllamaWithModel,
     identifyMacroTopic,
     semanticChunking,
     generateChapterSummary,

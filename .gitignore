@@ -33,3 +33,6 @@ Thumbs.db
 # 生产构建文件
 dist/
 build/
+
+# 测试文件
+test/

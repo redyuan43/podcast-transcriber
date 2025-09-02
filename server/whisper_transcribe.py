@@ -11,6 +11,15 @@ import time
 from pathlib import Path
 from faster_whisper import WhisperModel
 
+# 繁简转换
+try:
+    import opencc
+    HAS_OPENCC = True
+    print("✅ 繁简转换功能已启用", file=sys.stderr)
+except ImportError:
+    HAS_OPENCC = False
+    print("⚠️ 繁简转换库未安装，跳过转换", file=sys.stderr)
+
 class LocalWhisperTranscriber:
     def __init__(self, model_size="base", device="cpu", compute_type="int8"):
         """
@@ -24,6 +33,29 @@ class LocalWhisperTranscriber:
         print(f"🔄 正在加载Whisper模型: {model_size}", file=sys.stderr)
         self.model = WhisperModel(model_size, device=device, compute_type=compute_type)
         print(f"✅ 模型加载完成", file=sys.stderr)
+        
+        # 初始化繁简转换器
+        if HAS_OPENCC:
+            try:
+                self.converter = opencc.OpenCC('t2s')  # 繁体转简体，不需要.json后缀
+                print("🔄 繁简转换器已初始化", file=sys.stderr)
+            except Exception as e:
+                print(f"⚠️ 繁简转换器初始化失败: {e}", file=sys.stderr)
+                self.converter = None
+        else:
+            self.converter = None
+    
+    def convert_to_simplified(self, text):
+        """
+        将繁体中文转换为简体中文
+        """
+        if self.converter and text:
+            try:
+                return self.converter.convert(text)
+            except Exception as e:
+                print(f"⚠️ 繁简转换失败: {e}", file=sys.stderr)
+                return text
+        return text
 
     def transcribe_file(self, audio_path, language=None):
         """
@@ -40,26 +72,47 @@ class LocalWhisperTranscriber:
             print(f"🎤 开始转录: {audio_path}", file=sys.stderr)
             start_time = time.time()
             
-            # 执行转录
+            # 执行转录 - 自动检测语言，但中文统一使用简体
+            original_language = language
+            if language in ['zh', 'chinese', 'zh-cn', 'zh-tw']:
+                language = 'zh'  # Whisper的简体中文代码
+                print(f"🇨🇳 中文音频将使用简体中文转录", file=sys.stderr)
+            elif language is None:
+                print(f"🌐 自动检测语言模式", file=sys.stderr)
+            
             segments, info = self.model.transcribe(
                 audio_path, 
                 language=language,
                 vad_filter=True,  # 启用语音活动检测
-                vad_parameters=dict(min_silence_duration_ms=500)
+                vad_parameters=dict(min_silence_duration_ms=500),
+                # 添加其他参数来优化中文转录
+                beam_size=5,
+                best_of=5,
+                temperature=0.0  # 使用确定性解码
             )
             
             # 收集所有片段
             transcript_segments = []
             full_text = ""
             
+            # 根据检测的语言决定是否需要繁简转换
+            need_conversion = info.language in ['zh', 'chinese'] and original_language is None
+            if need_conversion:
+                print(f"🔄 检测到中文内容，将进行繁简转换", file=sys.stderr)
+            
             for segment in segments:
+                text = segment.text.strip()
+                # 如果是自动检测到的中文，进行繁简转换
+                if need_conversion:
+                    text = self.convert_to_simplified(text)
+                
                 segment_dict = {
                     "start": segment.start,
                     "end": segment.end,
-                    "text": segment.text.strip()
+                    "text": text
                 }
                 transcript_segments.append(segment_dict)
-                full_text += segment.text.strip() + " "
+                full_text += text + " "
             
             duration = time.time() - start_time
             

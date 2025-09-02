@@ -120,65 +120,98 @@ podcast-to-text/
 
 ```bash
 # Clone the repository
-git clone <https://github.com/wendy7756/
-podcast-transcriber>
+git clone <repository-url>
 cd podcast-transcriber
 
 # Install Node.js dependencies
 npm install
 
-# Create Python virtual environment (recommended)
+# Create Python virtual environment (required)
 python3 -m venv venv
 source venv/bin/activate  # Linux/macOS
 # or venv\Scripts\activate  # Windows
 
-# Install Python dependencies (local transcription)
+# Install Python dependencies for transcription and AI analysis
 pip install --upgrade pip
-pip install faster-whisper
+pip install faster-whisper opencc
 
-# Configure environment
+# Configure environment (optional for basic functionality)
 cp .env.example .env
-# Edit .env file, add your OpenAI API key
+# Edit .env file if needed
 
-# Start the application
-npm start
-# or development mode (auto-reload)
-npm run dev
+# Start the application in virtual environment
+source venv/bin/activate && npm start
+# or for development mode with auto-reload
+source venv/bin/activate && npm run dev
 
 # Access the application
 open http://localhost:3000
+```
+
+### ⚡ Quick Commands
+
+**Start the server:**
+```bash
+source venv/bin/activate && npm start
+```
+
+**Stop the server:**
+```bash
+pkill -f "node server/index.js"
+```
+
+**Check server status:**
+```bash
+curl http://localhost:3000/api/health
 ```
 
 ### ⚠️ Important Notes
 
 **Python Virtual Environment Setup**: The project requires a Python virtual environment named `venv` in the project root directory. This is essential because the Node.js server calls `./venv/bin/python` to execute transcription scripts.
 
-If you encounter errors like `/bin/sh: .../venv/bin/python: No such file or directory`, please ensure:
-
+**Required Steps:**
 1. Create the virtual environment in the project root: `python3 -m venv venv`
 2. Activate the virtual environment: `source venv/bin/activate`
-3. Install dependencies in the virtual environment: `pip install faster-whisper`
+3. Install dependencies: `pip install faster-whisper opencc`
+4. **Always start the server in virtual environment**: `source venv/bin/activate && npm start`
+
+If you encounter errors like `/bin/sh: .../venv/bin/python: No such file or directory`, please ensure you follow all steps above.
 
 ### Configuration
 
-Create a `.env` file with the following variables:
+The system works out-of-the-box with local transcription and Ollama AI analysis. Create a `.env` file for advanced configurations:
 
 ```env
-# OpenAI Configuration (for text optimization and summarization only)
-OPENAI_API_KEY=your_openai_api_key_here
-# Optional: custom OpenAI URL (compatible endpoint)
-
-# Local Whisper Configuration
+# Local Whisper Configuration (default enabled)
 USE_LOCAL_WHISPER=true
 WHISPER_MODEL=base
+
+# Enhanced Transcription (Speaker Diarization + Emotion Detection)
+USE_ENHANCED_TRANSCRIPTION=true
+
+# Ollama Configuration (for AI content analysis)
+USE_OLLAMA=true
+OLLAMA_BASE_URL=http://192.168.100.140:11434/v1
+OLLAMA_MODEL=qwen3:30b-a3b-instruct-2507-q4_K_M
+
+# Optional: OpenAI Configuration (for text optimization and summarization)
+# OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_BASE_URL=https://api.openai.com/v1
 
 # Server Configuration
 PORT=3000
 
-# Optional: Audio processing configuration
+# Optional: Audio processing limits
 MAX_SEGMENT_SIZE_MB=25
 SEGMENT_DURATION_SECONDS=600
 ```
+
+**Features Available:**
+- ✅ **Local Transcription**: Works without any API keys
+- ✅ **Speaker Diarization**: Identify different speakers
+- ✅ **Emotion Detection**: Detect emotional markers in speech
+- ✅ **AI Content Analysis**: Topic identification, professional terms matching, smart chaptering (requires Ollama)
+- ⚠️ **OpenAI Summarization**: Optional, requires API key
 
 ## 🔧 Troubleshooting
 

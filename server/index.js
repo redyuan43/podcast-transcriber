@@ -169,7 +169,7 @@ app.post('/api/process-podcast', async (req, res) => {
         });
 
         // 步骤5: 清理音频临时文件
-        cleanupAudioFiles(originalAudioPath, audioFiles);
+        // cleanupAudioFiles(originalAudioPath, audioFiles); // 已注释 - 保留音频文件
 
         // 发送完成进度
         if (sessionId) {
