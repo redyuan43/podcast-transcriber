@@ -8,6 +8,96 @@ const contentAnalysisService = require('./contentAnalysisService');
 // 导入情感分析服务
 const EmotionAnalysisService = require('./emotionAnalysisService');
 
+/**
+ * 生成增强转录文本（包含说话人和时间戳）
+ */
+function generateEnhancedTranscriptText(segments, speakers) {
+    if (!segments || !speakers) return '';
+    
+    let enhancedText = '# 🎙️ 对话转录\n\n';
+    let currentSpeaker = null;
+    let speakerSegments = [];
+    
+    // 按说话人分组处理
+    for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+        const speaker = speakers[i] || '未知';
+        
+        // 说话人变化时，输出之前的内容
+        if (speaker !== currentSpeaker) {
+            if (currentSpeaker && speakerSegments.length > 0) {
+                enhancedText += formatSpeakerBlock(currentSpeaker, speakerSegments);
+                speakerSegments = [];
+            }
+            currentSpeaker = speaker;
+        }
+        
+        // 添加到当前说话人的段落
+        speakerSegments.push(segment);
+    }
+    
+    // 处理最后一个说话人的内容
+    if (currentSpeaker && speakerSegments.length > 0) {
+        enhancedText += formatSpeakerBlock(currentSpeaker, speakerSegments);
+    }
+    
+    return enhancedText;
+}
+
+/**
+ * 格式化单个说话人的内容块
+ */
+function formatSpeakerBlock(speaker, segments) {
+    const startTime = formatTimeForTranscript(segments[0].start);
+    const endTime = formatTimeForTranscript(segments[segments.length - 1].end);
+    const duration = Math.round(segments[segments.length - 1].end - segments[0].start);
+    
+    let block = `\n## 👤 ${speaker}\n`;
+    block += `**时间段**: ${startTime} - ${endTime} (${duration}秒)\n\n`;
+    
+    // 将连续的短句合并成段落
+    let paragraph = '';
+    for (const segment of segments) {
+        const text = segment.text.trim();
+        if (text) {
+            // 如果当前句子很短且前面有内容，合并到段落中
+            if (text.length < 30 && paragraph.length > 0) {
+                paragraph += text + ' ';
+            } else {
+                // 输出之前的段落
+                if (paragraph) {
+                    block += `${paragraph.trim()}\n\n`;
+                    paragraph = '';
+                }
+                // 开始新段落
+                paragraph = text + ' ';
+            }
+        }
+    }
+    
+    // 输出最后的段落
+    if (paragraph) {
+        block += `${paragraph.trim()}\n\n`;
+    }
+    
+    block += '---\n\n';
+    return block;
+}
+
+/**
+ * 格式化时间（秒转为HH:MM:SS或MM:SS）
+ */
+function formatTimeForTranscript(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    
+    if (hours > 0) {
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
 const execAsync = promisify(exec);
 
 /**
@@ -105,6 +195,7 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
 
         let transcript = '';
         let savedFiles = [];
+        let result = {}; // 声明result变量在更大的作用域
 
         if (files.length === 1) {
             // 单文件处理 - Python脚本总是保存转录文本
@@ -129,24 +220,57 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
             }
             console.log(`⚙️ 执行命令: ${command}`);
             
-            const { stdout, stderr } = await execAsync(command, {
-                cwd: path.join(__dirname, '..'),
-                maxBuffer: 1024 * 1024 * 20,
-                timeout: 3600000 // 1小时超时，支持长音频
-            });
-            
-            if (stderr && stderr.trim()) {
-                console.log(`🔧 Whisper日志: ${stderr.trim()}`);
+            // 启动转录进度模拟器
+            let progressInterval = null;
+            let currentProgress = 30;
+            if (sendProgressCallback && sessionId) {
+                progressInterval = setInterval(() => {
+                    if (currentProgress < 45) {
+                        currentProgress += 1;
+                        const stageText = outputLanguage === 'zh' ? '正在转录音频...' : 'Transcribing audio...';
+                        sendProgressCallback(sessionId, currentProgress, 'transcribing', stageText);
+                    }
+                }, 8000); // 每8秒增加1%，模拟转录进度
             }
             
-            const result = JSON.parse(stdout);
-            
-            if (!result.success) {
-                throw new Error(result.error || '转录失败');
+            try {
+                const { stdout, stderr } = await execAsync(command, {
+                    cwd: path.join(__dirname, '..'),
+                    maxBuffer: 1024 * 1024 * 20,
+                    timeout: 3600000 // 1小时超时，支持长音频
+                });
+                
+                // 清除进度模拟器
+                if (progressInterval) {
+                    clearInterval(progressInterval);
+                    // 转录完成，跳到45%
+                    if (sendProgressCallback && sessionId) {
+                        const stageText = outputLanguage === 'zh' ? '转录完成，正在处理...' : 'Transcription complete, processing...';
+                        sendProgressCallback(sessionId, 45, 'processing', stageText);
+                    }
+                }
+                
+                if (stderr && stderr.trim()) {
+                    console.log(`🔧 Whisper日志: ${stderr.trim()}`);
+                }
+                
+                result = JSON.parse(stdout);
+                
+                if (!result.success) {
+                    throw new Error(result.error || '转录失败');
+                }
+                
+                transcript = result.text || '';
+                savedFiles = result.savedFiles || [];
+                
+                // 继续处理，不要提前返回
+            } catch (error) {
+                // 清除进度模拟器
+                if (progressInterval) {
+                    clearInterval(progressInterval);
+                }
+                throw error;
             }
-            
-            transcript = result.text || '';
-            savedFiles = result.savedFiles || [];
             
             // 获取检测到的语言信息
             result.detectedLanguage = result.language || audioLanguage || 'auto';
@@ -160,8 +284,8 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
             let optimizationSuccess = false;
             
             // 发送优化阶段进度
-            if (sendProgressCallback) {
-                sendProgressCallback(50, 'optimizing', outputLanguage === 'zh' ? '优化转录文本' : 'Optimizing transcript');
+            if (sendProgressCallback && sessionId) {
+                sendProgressCallback(sessionId, 50, 'optimizing', outputLanguage === 'zh' ? '优化转录文本' : 'Optimizing transcript');
             }
             
             for (let retryCount = 0; retryCount < 3; retryCount++) {
@@ -281,8 +405,8 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
             let analysisResult = null;
             if (process.env.USE_OLLAMA === 'true' && result.segments) {
                 console.log('\n🤖 开始AI内容分析...');
-                if (sendProgressCallback) {
-                    sendProgressCallback(80, 'analyzing', outputLanguage === 'zh' ? 'AI内容分析' : 'AI Content Analysis');
+                if (sendProgressCallback && sessionId) {
+                    sendProgressCallback(sessionId, 80, 'analyzing', outputLanguage === 'zh' ? 'AI内容分析' : 'AI Content Analysis');
                 }
                 
                 try {
@@ -372,9 +496,17 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
                 }
             }
             
+            // 生成增强转录文本（如果有说话人和时间信息）
+            let enhancedTranscript = transcript;
+            if (result.enhanced && result.segments && result.speakers) {
+                enhancedTranscript = generateEnhancedTranscriptText(result.segments, result.speakers);
+                console.log('📝 生成增强转录文本，包含说话人和时间信息');
+            }
+            
             // 返回处理后的结果
             return {
-                transcript: transcript,
+                transcript: enhancedTranscript, // 使用增强格式的转录文本
+                rawTranscript: transcript, // 保留原始纯文本
                 summary: result.summary || null, // 如果有总结则包含
                 translation: result.translation || null, // 如果有翻译则包含
                 language: outputLanguage,
@@ -383,7 +515,10 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
                 audioDuration: result.audioDuration, // 从Whisper获取的真实音频时长
                 savedFiles: savedFiles,
                 analysis: analysisResult, // AI内容分析结果（原始数据）
-                analysisData: analysisData // 结构化分析数据（前端用）
+                analysisData: analysisData, // 结构化分析数据（前端用）
+                enhanced: result.enhanced || false, // 是否使用了增强转录
+                segments: result.segments || null, // 时间分段信息
+                speakers: result.speakers || null // 说话人信息
             };
             
         } else {
