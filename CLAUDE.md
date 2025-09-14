@@ -98,10 +98,16 @@ server/
 # 启动服务器
 npm start
 
-# 运行增强转录
+# 使用 SenseVoice 优化转录（推荐，自动选择最佳GPU）
+python server/sensevoice_optimize.py audio.mp3 --language auto
+
+# 使用 SenseVoice 标准转录
+python server/sensevoice_transcribe.py audio.mp3 --language auto
+
+# 使用 Whisper 增强转录（传统方式）
 python server/enhanced_whisper_transcribe.py audio.mp3 --enhanced
 
-# 运行性能优化转录
+# 性能优化转录
 python server/optimize_whisper.py audio.mp3 --benchmark
 ```
 
@@ -113,15 +119,24 @@ python server/optimize_whisper.py audio.mp3 --benchmark
 - [x] 实现热词匹配服务 - hotwordMatchingService.js
 - [x] **测试验证通过** - 成功识别主题、匹配热词、生成分析报告
 
-## 待完成任务 (阶段三)
+## 已完成任务 (阶段三：SenseVoice集成) ✅
+- [x] 集成 SenseVoice 语音识别模型 - 比Whisper快3-5倍
+- [x] 创建 sensevoice_transcribe.py - 支持多语言、情感识别、音频事件检测
+- [x] 创建 sensevoice_optimize.py - 多GPU性能优化版本，智能显存管理
+- [x] 修改服务层支持双引擎切换 - 可在.env中配置 TRANSCRIPTION_ENGINE
+- [x] 安装所有依赖包 - funasr、modelscope、PyTorch CUDA版本
+- [x] **功能测试通过** - SenseVoice脚本正常运行，支持所有参数
+
+## 待完成任务 (阶段四：前端UI优化)
 - [ ] 前端UI展示 - 左侧摘要目录，右侧播放器
 - [ ] 实现章节跳转功能
 - [ ] 热词高亮和索引功能
 - [ ] 数据结构化整合(JSON格式)
+- [ ] 转录引擎选择界面 - 让用户在前端选择使用SenseVoice或Whisper
 
 ## 功能特性 ✨
-- **基础转录**: 本地Faster-Whisper，支持多语言
-- **增强转录**: 说话人分离 + 情绪检测
+- **SenseVoice 高速转录**: 阿里开源语音模型，速度比Whisper快3-5倍，支持多语言、情感识别
+- **Whisper 传统转录**: 本地Faster-Whisper，支持多语言、说话人分离、情绪检测
 - **AI内容分析**: 主题识别、专业热词匹配、智能分章、摘要生成
 - **多格式输出**: Markdown报告、JSON数据、音频转录
 

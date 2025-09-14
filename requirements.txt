@@ -1,0 +1,43 @@
+# Core dependencies
+python-multipart
+python-dotenv
+requests
+ffmpeg-python
+pyttsx3
+soundfile
+librosa
+pandas
+numpy
+webrtcvad
+scikit-learn
+PyYAML
+tqdm
+pyaudio
+Unidecode
+zhconv
+moviepy>=2.1.1
+uvicorn
+pydub
+
+# Cloud storage
+google-cloud-storage
+google-cloud-speech
+azure-storage-blob
+azure-cognitiveservices-speech
+anthropic
+
+# Original Whisper dependencies
+faster-whisper==1.1.0
+openai-whisper==20240930
+
+# PyTorch dependencies (shared by both Whisper and SenseVoice)
+torch>=2.7.1
+torchaudio>=2.7.1
+
+# Speaker diarization (for Whisper enhanced mode)
+pyannote.audio>=3.3.2
+speechbrain
+
+# SenseVoice dependencies (faster transcription)
+funasr>=1.2.7
+modelscope>=1.29.2

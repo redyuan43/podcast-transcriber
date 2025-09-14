@@ -200,23 +200,44 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
         if (files.length === 1) {
             // 单文件处理 - Python脚本总是保存转录文本
             console.log(`🎵 单文件处理模式`);
-            
-            // Python脚本转录并直接保存转录文本 - 支持增强模式
-            const useEnhanced = process.env.USE_ENHANCED_TRANSCRIPTION !== 'false'; // 默认启用增强模式
-            const scriptPath = useEnhanced 
-                ? path.join(__dirname, '..', 'enhanced_whisper_transcribe.py')
-                : path.join(__dirname, '..', 'whisper_transcribe.py');
-            
-            const filePrefix = generateFilePrefix('raw', podcastTitle || 'Untitled');
+
+            // 选择转录引擎：SenseVoice 或 Whisper
+            const transcriptionEngine = process.env.TRANSCRIPTION_ENGINE || 'whisper';
             const venvPython = path.join(__dirname, '..', '..', 'venv', 'bin', 'python');
-            
-            let command = `"${venvPython}" "${scriptPath}" "${files[0]}" --model ${process.env.WHISPER_MODEL || 'base'} --save-transcript "${tempDir}" --file-prefix "${filePrefix}" --podcast-title "${podcastTitle || 'Untitled'}" --source-url "${originalUrl || ''}"`;
-            
-            if (useEnhanced) {
-                command += ' --enhanced'; // 启用增强功能
-                console.log(`🎤 Python增强脚本转录并保存: ${path.basename(files[0])} (说话人分离+情绪检测)`);
+            const filePrefix = generateFilePrefix('raw', podcastTitle || 'Untitled');
+            let command;
+
+            if (transcriptionEngine === 'sensevoice') {
+                // 使用 SenseVoice 转录（更快）
+                const useOptimize = process.env.SENSEVOICE_OPTIMIZE !== 'false'; // 默认使用优化版本
+                const scriptPath = useOptimize
+                    ? path.join(__dirname, '..', 'sensevoice_optimize.py')
+                    : path.join(__dirname, '..', 'sensevoice_transcribe.py');
+                const language = process.env.SENSEVOICE_LANGUAGE || 'auto';
+                const batchSize = process.env.SENSEVOICE_BATCH_SIZE || '500';
+
+                if (useOptimize) {
+                    command = `"${venvPython}" "${scriptPath}" "${files[0]}" --language ${language} --save-transcript "${tempDir}" --file-prefix "${filePrefix}" --podcast-title "${podcastTitle || 'Untitled'}" --source-url "${originalUrl || ''}"`;
+                    console.log(`⚡ SenseVoice 优化转录: ${path.basename(files[0])} (多GPU优化, 语言=${language})`);
+                } else {
+                    command = `"${venvPython}" "${scriptPath}" "${files[0]}" --language ${language} --batch-size ${batchSize} --save-transcript "${tempDir}" --file-prefix "${filePrefix}" --podcast-title "${podcastTitle || 'Untitled'}" --source-url "${originalUrl || ''}"`;
+                    console.log(`🚀 SenseVoice 标准转录: ${path.basename(files[0])} (语言=${language})`);
+                }
             } else {
-                console.log(`🎤 Python脚本转录并保存: ${path.basename(files[0])}`);
+                // 使用 Whisper 转录（传统方式）
+                const useEnhanced = process.env.USE_ENHANCED_TRANSCRIPTION !== 'false'; // 默认启用增强模式
+                const scriptPath = useEnhanced
+                    ? path.join(__dirname, '..', 'enhanced_whisper_transcribe.py')
+                    : path.join(__dirname, '..', 'whisper_transcribe.py');
+
+                command = `"${venvPython}" "${scriptPath}" "${files[0]}" --model ${process.env.WHISPER_MODEL || 'base'} --save-transcript "${tempDir}" --file-prefix "${filePrefix}" --podcast-title "${podcastTitle || 'Untitled'}" --source-url "${originalUrl || ''}"`;
+
+                if (useEnhanced) {
+                    command += ' --enhanced'; // 启用增强功能
+                    console.log(`🎤 Whisper增强转录: ${path.basename(files[0])} (说话人分离+情绪检测)`);
+                } else {
+                    console.log(`🎤 Whisper标准转录: ${path.basename(files[0])}`);
+                }
             }
             console.log(`⚙️ 执行命令: ${command}`);
             
@@ -227,10 +248,11 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
                 progressInterval = setInterval(() => {
                     if (currentProgress < 45) {
                         currentProgress += 1;
-                        const stageText = outputLanguage === 'zh' ? '正在转录音频...' : 'Transcribing audio...';
+                        const engineName = process.env.TRANSCRIPTION_ENGINE === 'sensevoice' ? 'SenseVoice' : 'Whisper';
+                        const stageText = outputLanguage === 'zh' ? `${engineName} 正在转录音频...` : `${engineName} transcribing audio...`;
                         sendProgressCallback(sessionId, currentProgress, 'transcribing', stageText);
                     }
-                }, 8000); // 每8秒增加1%，模拟转录进度
+                }, process.env.TRANSCRIPTION_ENGINE === 'sensevoice' ? 3000 : 8000); // SenseVoice更快，进度更新更频繁
             }
             
             try {
@@ -251,9 +273,13 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
                 }
                 
                 if (stderr && stderr.trim()) {
-                    console.log(`🔧 Whisper日志: ${stderr.trim()}`);
+                    console.log(`🔧 转录日志: ${stderr.trim()}`);
                 }
-                
+
+                // 调试：输出原始stdout内容
+                console.log(`📝 原始输出长度: ${stdout.length} 字符`);
+                console.log(`📝 输出前100字符: ${stdout.substring(0, 100)}`);
+
                 result = JSON.parse(stdout);
                 
                 if (!result.success) {

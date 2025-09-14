@@ -36,3 +36,4 @@ build/
 
 # 测试文件
 test/
+server/__pycache__/

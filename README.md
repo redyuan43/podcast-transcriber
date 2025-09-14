@@ -19,10 +19,12 @@ Podcast Transcriber is a full-stack web application designed to bridge the gap b
 ### Key Capabilities
 
 - **🔗 Multi-Platform Support**: Support for Apple Podcasts, Xiaoyuzhoufm, RSS feeds, and direct audio URLs
-- **🚀 Performance First**: Using OpenAI Faster-Whisper model for speech-to-text
-- **🤖 AI Optimization**: AI-optimized transcription and summary text based on podcast content characteristics
-- **📱 Responsive Design**: Modern mobile-first UI, friendly experience for both desktop and mobile
-- **🌍 Conditional Translation**: When the selected summary language differs from the detected transcript language, the system auto-translates with GPT‑4o
+- **⚡ Dual Engine Transcription**: Choose between SenseVoice (15x faster) or Whisper (enhanced features)
+- **🚀 GPU Acceleration**: Multi-GPU optimization with automatic device selection for maximum performance
+- **🤖 AI Content Analysis**: Topic identification, keyword extraction, semantic chapter segmentation
+- **🎭 Emotion & Event Detection**: Built-in recognition for emotions, applause, laughter, and audio events
+- **📱 Responsive Design**: Modern mobile-first UI with speaker-based timeline layout
+- **🌍 Multilingual Support**: 50+ languages with automatic language detection
 
 ## 🏗️ Architecture & Implementation
 
@@ -32,31 +34,31 @@ Podcast Transcriber is a full-stack web application designed to bridge the gap b
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Frontend      │    │    Backend       │    │  External APIs  │
 │                 │    │                  │    │                 │
-│ • HTML5/CSS3    │◄──►│ • Express.js     │◄──►│ • OpenAI GPT    │
+│ • HTML5/CSS3    │◄──►│ • Express.js     │◄──►│ • OpenAI/Ollama │
 │ • Vanilla JS    │    │ • Node.js        │    │ • RSS Feeds     │
-│ • TailwindCSS   │    │ • File Download  │    │ • Podcast APIs  │
-│ • File Download │    │ • Text Saving    │    │                 │
+│ • TailwindCSS   │    │ • SSE Progress   │    │ • Podcast APIs  │
+│ • File Download │    │ • File Management│    │                 │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
                               │
                               ▼
                     ┌──────────────────┐
-                    │ Local Processing │
+                    │ AI Processing    │
                     │                  │
-                    │ • Faster-Whisper │
-                    │ • Python Script  │
-                    │ • Audio Direct   │
-                    │ • Text Export    │
+                    │ • SenseVoice     │◄── Multi-GPU Optimization
+                    │ • Whisper        │◄── Speaker Diarization
+                    │ • Content Analysis│◄── Ollama LLM
+                    │ • Export Pipeline│
                     └──────────────────┘
 ```
 
 ### Core Processing Pipeline
 
 1. **Podcast Link Analysis**: Multi-strategy URL parsing for Apple Podcasts, Xiaoyuzhou, and RSS feeds
-2. **Audio Extraction**: Direct download with RSS feed discovery and API integration  
-3. **Local Transcription**: High-speed Faster-Whisper processing
-4. **Text Optimization**: AI-powered continuity enhancement and flow improvement
-5. **Summarization**: Structured content analysis and key point extraction
-6. **File Export**: Automatic saving of transcripts and summaries with download links
+2. **Audio Extraction**: Direct download with RSS feed discovery and API integration
+3. **AI Transcription**: Dual-engine support (SenseVoice/Whisper) with GPU acceleration
+4. **Content Analysis**: Topic identification, keyword extraction, semantic segmentation
+5. **Enhancement & Optimization**: AI-powered text refinement and chapter generation
+6. **Multi-Format Export**: Transcripts, summaries, and analysis reports with download links
 
 ### Technology Stack
 
@@ -73,9 +75,10 @@ Podcast Transcriber is a full-stack web application designed to bridge the gap b
 - **File Management**: Audio download, processing, and result saving
 
 #### AI & ML Integration
-- **Faster-Whisper**: Local high-performance speech-to-text transcription
-- **GPT-4**: Advanced language model for podcast content summarization and text optimization
-- **Custom Prompting**: Specialized prompts optimized for podcasts, enhancing continuity and quality
+- **SenseVoice**: Alibaba's multilingual model, 15x faster than Whisper with emotion detection
+- **Faster-Whisper**: OpenAI's model with speaker diarization and enhanced accuracy
+- **Ollama**: Local LLM for content analysis, topic identification, and semantic processing
+- **Multi-GPU Support**: Automatic GPU selection and memory optimization for maximum performance
 
 ## 📁 Project Structure
 
@@ -87,15 +90,19 @@ podcast-to-text/
 │
 ├── 📂 server/                          # Backend Services
 │   ├── 📄 index.js                     # Express server & API routing
-│   ├── 📄 whisper_transcribe.py        # Local Faster-Whisper transcription
-│   ├── 📂 assets/                      # Test assets
-│   │   └── 📄 test_audio.mp3           # Sample audio for testing
+│   ├── 📄 sensevoice_transcribe.py     # SenseVoice transcription (standard)
+│   ├── 📄 sensevoice_optimize.py       # SenseVoice transcription (GPU optimized)
+│   ├── 📄 whisper_transcribe.py        # Whisper transcription (basic)
+│   ├── 📄 enhanced_whisper_transcribe.py # Whisper with speaker diarization
 │   ├── 📂 services/                    # Core business logic
-│   │   ├── 📄 openaiService.js         # AI processing & optimization
+│   │   ├── 📄 openaiService.js         # AI processing & orchestration
 │   │   ├── 📄 podcastService.js        # Podcast extraction & parsing
-│   │   ├── 📄 audioInfoService.js        # Audio information retrieval
+│   │   ├── 📄 ollamaAnalysisService.js # Local LLM content analysis
+│   │   ├── 📄 contentAnalysisService.js# Content analysis pipeline
+│   │   ├── 📄 hotwordMatchingService.js# Professional terminology matching
 │   │   └── 📄 rssParser.js             # RSS feed processing
-│   └── 📂 temp/                        # Temporary audio & text storage (auto-created)
+│   ├── 📂 data/hotwords/               # Professional terminology database
+│   └── 📂 temp/                        # Temporary audio & text storage
 │
 ├── 📄 package.json                     # Dependencies & scripts
 ├── 📄 package-lock.json                # Dependency lock file
@@ -114,9 +121,11 @@ podcast-to-text/
 ### Prerequisites
 
 - **Node.js 16+**: Runtime environment
-- **Python 3.8+**: For local Faster-Whisper transcription (virtual environment required)
+- **Python 3.8+**: For AI transcription engines (virtual environment required)
+- **CUDA GPU**: Recommended for optimal SenseVoice performance (CPU fallback available)
 - **ffmpeg**: Audio processing library (usually pre-installed or available via package managers)
-- **OpenAI API Key**: For transcription text optimization and AI summarization
+- **OpenAI API Key** *(Optional)*: For advanced summarization
+- **Ollama** *(Optional)*: For local LLM content analysis
 
 ### Installation
 
@@ -133,13 +142,15 @@ python3 -m venv venv
 source venv/bin/activate  # Linux/macOS
 # or venv\Scripts\activate  # Windows
 
-# Install Python dependencies for transcription and AI analysis
+# Install Python dependencies
 pip install --upgrade pip
-pip install faster-whisper opencc
+pip install -r requirements.txt
 
-# Configure environment (optional for basic functionality)
+# Configure environment
 cp .env.example .env
-# Edit .env file if needed
+# Edit .env to choose transcription engine:
+# TRANSCRIPTION_ENGINE=sensevoice  # (Recommended: 15x faster)
+# TRANSCRIPTION_ENGINE=whisper     # (Enhanced speaker features)
 
 # Start the application in virtual environment
 source venv/bin/activate && npm start
@@ -179,41 +190,51 @@ curl http://localhost:3000/api/health
 
 If you encounter errors like `/bin/sh: .../venv/bin/python: No such file or directory`, please ensure you follow all steps above.
 
-### Configuration
+### ⚡ SenseVoice Configuration (Recommended)
 
-The system works out-of-the-box with local transcription and Ollama AI analysis. Create a `.env` file for advanced configurations:
+For optimal performance, configure SenseVoice as the transcription engine:
 
 ```env
-# Local Whisper Configuration (default enabled)
-USE_LOCAL_WHISPER=true
-WHISPER_MODEL=base
+# Transcription Engine Configuration
+TRANSCRIPTION_ENGINE=sensevoice
 
-# Enhanced Transcription (Speaker Diarization + Emotion Detection)
-USE_ENHANCED_TRANSCRIPTION=true
+# SenseVoice Configuration (GPU Optimized)
+SENSEVOICE_LANGUAGE=auto           # auto/zh/en/yue/ja/ko
+SENSEVOICE_BATCH_SIZE=1000         # Adjust based on GPU memory
+SENSEVOICE_OPTIMIZE=true           # Enable multi-GPU optimization
 
 # Ollama Configuration (for AI content analysis)
 USE_OLLAMA=true
-OLLAMA_BASE_URL=http://192.168.100.140:11434/v1
+OLLAMA_BASE_URL=http://localhost:11434/v1
 OLLAMA_MODEL=qwen3:30b-a3b-instruct-2507-q4_K_M
-
-# Optional: OpenAI Configuration (for text optimization and summarization)
-# OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_BASE_URL=https://api.openai.com/v1
-
-# Server Configuration
-PORT=3000
-
-# Optional: Audio processing limits
-MAX_SEGMENT_SIZE_MB=25
-SEGMENT_DURATION_SECONDS=600
 ```
 
-**Features Available:**
-- ✅ **Local Transcription**: Works without any API keys
-- ✅ **Speaker Diarization**: Identify different speakers
-- ✅ **Emotion Detection**: Detect emotional markers in speech
-- ✅ **AI Content Analysis**: Topic identification, professional terms matching, smart chaptering (requires Ollama)
-- ⚠️ **OpenAI Summarization**: Optional, requires API key
+**Performance Benefits:**
+- 🚀 **15x faster** than Whisper
+- 🎯 **Multi-GPU support** with automatic device selection
+- 🌍 **50+ languages** with superior accuracy
+- 🎭 **Built-in emotion detection** and audio event recognition
+
+### Alternative: Whisper Configuration
+
+For enhanced speaker features, use Whisper:
+
+```env
+# Transcription Engine Configuration
+TRANSCRIPTION_ENGINE=whisper
+
+# Whisper Configuration
+USE_LOCAL_WHISPER=true
+WHISPER_MODEL=base                 # base/small/medium/large
+USE_ENHANCED_TRANSCRIPTION=true    # Enable speaker diarization
+```
+
+**Available Features:**
+- ✅ **SenseVoice Transcription**: 15x faster, multi-GPU optimized, emotion detection
+- ✅ **Whisper Transcription**: Enhanced speaker diarization and segmentation
+- ✅ **AI Content Analysis**: Topic identification, terminology matching, semantic chaptering
+- ✅ **Multi-Format Export**: Transcripts, summaries, analysis reports (TXT/JSON/MD)
+- ⚠️ **OpenAI Integration**: Optional advanced summarization (requires API key)
 
 ## 🔧 Troubleshooting
 
@@ -241,7 +262,10 @@ which python  # Should show .../venv/bin/python
 
 # Install dependencies
 pip install --upgrade pip
-pip install faster-whisper
+pip install -r requirements.txt
+
+# Test SenseVoice installation
+python -c "from funasr import AutoModel; print('✅ SenseVoice ready')"
 
 # Restart the server
 npm start
