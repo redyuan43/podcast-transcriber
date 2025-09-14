@@ -61,9 +61,25 @@ app.get('/api/progress/:sessionId', (req, res) => {
     // 发送初始连接确认
     res.write(`data: ${JSON.stringify({ type: 'connected', sessionId })}\n\n`);
     
+    // 设置心跳机制，每30秒发送一次心跳
+    const heartbeatInterval = setInterval(() => {
+        if (progressClients.has(sessionId)) {
+            try {
+                res.write(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: Date.now() })}\n\n`);
+            } catch (error) {
+                console.log(`❌ 心跳发送失败: ${sessionId}`, error.message);
+                clearInterval(heartbeatInterval);
+                progressClients.delete(sessionId);
+            }
+        } else {
+            clearInterval(heartbeatInterval);
+        }
+    }, 30000); // 30秒心跳
+    
     // 客户端断开连接时清理
     req.on('close', () => {
         console.log(`🔌 SSE连接断开: sessionId=${sessionId}`);
+        clearInterval(heartbeatInterval);
         progressClients.delete(sessionId);
     });
 });

@@ -1093,6 +1093,8 @@ function activateTab(tabId) {
 
 // SSE 进度监听函数
 function setupProgressListener(eventSource) {
+    let lastHeartbeat = Date.now();
+    
     eventSource.onmessage = function(event) {
         try {
             const data = JSON.parse(event.data);
@@ -1106,15 +1108,45 @@ function setupProgressListener(eventSource) {
                 console.log(`📊 收到进度更新: ${data.progress}% - ${data.stageText}`);
             } else if (data.type === 'connected') {
                 console.log('✅ SSE连接已建立:', data.sessionId);
+            } else if (data.type === 'heartbeat') {
+                lastHeartbeat = Date.now();
+                console.log('💓 收到心跳信号，连接正常');
             }
         } catch (error) {
             console.error('解析SSE数据失败:', error);
         }
     };
     
+    // 监控连接状态，如果超过2分钟没有消息则提示用户
+    const connectionMonitor = setInterval(() => {
+        const timeSinceLastHeartbeat = Date.now() - lastHeartbeat;
+        if (timeSinceLastHeartbeat > 120000) { // 2分钟
+            console.warn('⚠️ SSE连接可能中断，尝试重新连接...');
+            if (smartProgressBar) {
+                smartProgressBar.updateProgress(
+                    smartProgressBar.currentProgress, 
+                    '连接中断，正在重新连接...', 
+                    true
+                );
+            }
+        }
+    }, 60000); // 每分钟检查一次
+    
     eventSource.onerror = function(error) {
-        console.error('SSE连接错误:', error);
-        eventSource.close();
+        console.error('❌ SSE连接错误:', error);
+        clearInterval(connectionMonitor);
+        if (smartProgressBar) {
+            smartProgressBar.updateProgress(
+                smartProgressBar.currentProgress, 
+                '连接中断，请耐心等待处理完成...', 
+                false
+            );
+        }
+    };
+    
+    eventSource.onclose = function() {
+        console.log('🔌 SSE连接已关闭');
+        clearInterval(connectionMonitor);
     };
 }
 
@@ -1321,6 +1353,58 @@ function highlightCurrentSegment(currentTime) {
     });
 }
 
+// 更新当前播放段落的高亮（优化版本）
+function updateCurrentSegmentHighlight(currentTime) {
+    const allSegments = document.querySelectorAll('.speaker-segment-card');
+    let currentSegmentFound = false;
+    let activeSegment = null;
+    
+    allSegments.forEach(segment => {
+        const startTime = parseFloat(segment.dataset.startTime);
+        const endTime = parseFloat(segment.dataset.endTime);
+        
+        // 移除所有高亮
+        segment.classList.remove('ring-2', 'ring-blue-400', 'ring-green-400', 'current-playing');
+        
+        // 检查是否是当前播放的段落
+        if (currentTime >= startTime && currentTime <= endTime) {
+            const speaker = segment.dataset.speaker;
+            const ringColor = speaker === '主持人' ? 'ring-blue-400' : 'ring-green-400';
+            segment.classList.add('ring-2', ringColor, 'current-playing');
+            
+            activeSegment = segment;
+            currentSegmentFound = true;
+            
+            // 更新播放器信息
+            const currentSegmentInfo = document.getElementById('currentSegmentInfo');
+            if (currentSegmentInfo) {
+                const timeStr = formatTimeFromSeconds(currentTime);
+                currentSegmentInfo.textContent = `正在播放：${speaker} - ${timeStr}`;
+            }
+        }
+    });
+    
+    // 如果找到了当前播放的段落，滚动到可见区域
+    if (activeSegment && currentSegmentFound) {
+        scrollToCurrentSegment(activeSegment);
+    }
+    
+    return currentSegmentFound;
+}
+
+// 滚动到当前播放的段落
+function scrollToCurrentSegment(segmentElement) {
+    // 使用防抖避免过频繁的滚动
+    if (!scrollToCurrentSegment.lastScroll || Date.now() - scrollToCurrentSegment.lastScroll > 2000) {
+        segmentElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'nearest'
+        });
+        scrollToCurrentSegment.lastScroll = Date.now();
+    }
+}
+
 // 格式化秒数为时间字符串
 function formatTimeFromSeconds(seconds) {
     const hours = Math.floor(seconds / 3600);
@@ -1404,6 +1488,21 @@ function setupAudioPlayer(audioUrl) {
     audioSource.src = audioUrl;
     audioPlayer.load();
     audioPlayerSection.classList.remove('hidden');
+    
+    // 添加播放时间监听器，实现自动高亮当前章节
+    audioPlayer.addEventListener('timeupdate', () => {
+        const currentTime = audioPlayer.currentTime;
+        updateCurrentSegmentHighlight(currentTime);
+    });
+    
+    // 播放状态变化监听
+    audioPlayer.addEventListener('play', () => {
+        console.log('🎵 开始播放');
+    });
+    
+    audioPlayer.addEventListener('pause', () => {
+        console.log('⏸️ 播放暂停');
+    });
     
     console.log('🎵 音频播放器已设置:', audioUrl);
 }

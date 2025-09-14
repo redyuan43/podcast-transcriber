@@ -19,6 +19,41 @@
         }
     </script>
     <style>
+        /* 当前播放段落的特殊样式 */
+        .current-playing {
+            animation: pulse-glow 2s ease-in-out infinite;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% { 
+                box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+            }
+            50% { 
+                box-shadow: 0 0 25px rgba(59, 130, 246, 0.5);
+            }
+        }
+        
+        /* 段落卡片悬浮动画 */
+        .speaker-segment-card {
+            transition: all 0.3s ease;
+        }
+        
+        .speaker-segment-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        /* 播放按钮动画 */
+        .play-segment-btn:hover svg {
+            transform: scale(1.1);
+        }
+        
+        /* 时间轴线条渐变优化 */
+        #timelineLine {
+            background: linear-gradient(to bottom, #3b82f6, #6366f1, #8b5cf6);
+        }
+    </style>
+    <style>
         .gradient-bg {
             background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
         }
