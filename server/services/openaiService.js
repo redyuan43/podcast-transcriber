@@ -223,6 +223,19 @@ async function processAudioWithOpenAI(audioFiles, shouldSummarize = false, outpu
                     command = `"${venvPython}" "${scriptPath}" "${files[0]}" --language ${language} --batch-size ${batchSize} --save-transcript "${tempDir}" --file-prefix "${filePrefix}" --podcast-title "${podcastTitle || 'Untitled'}" --source-url "${originalUrl || ''}"`;
                     console.log(`🚀 SenseVoice 标准转录: ${path.basename(files[0])} (语言=${language})`);
                 }
+            } else if (transcriptionEngine === 'sensevoice_diarization') {
+                // 使用 SenseVoice + PyAnnote 组合（速度 + 说话人分离）
+                const scriptPath = path.join(__dirname, '..', 'sensevoice_with_diarization.py');
+                const language = process.env.SENSEVOICE_LANGUAGE || 'auto';
+                const numSpeakers = process.env.PYANNOTE_NUM_SPEAKERS || '';
+
+                command = `"${venvPython}" "${scriptPath}" "${files[0]}" --language ${language} --save-transcript "${tempDir}" --file-prefix "${filePrefix}" --podcast-title "${podcastTitle || 'Untitled'}" --source-url "${originalUrl || ''}"`;
+
+                if (numSpeakers) {
+                    command += ` --num-speakers ${numSpeakers}`;
+                }
+
+                console.log(`🎭 SenseVoice + PyAnnote 组合: ${path.basename(files[0])} (高速转录 + 精确说话人分离)`);
             } else {
                 // 使用 Whisper 转录（传统方式）
                 const useEnhanced = process.env.USE_ENHANCED_TRANSCRIPTION !== 'false'; // 默认启用增强模式
